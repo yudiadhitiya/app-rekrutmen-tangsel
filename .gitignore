@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+frontend/dist/
+backend/rekr-server
+backend/bin/
+
+# Runtime data: contains session secrets, user password hashes and stored records
+data/
+backend/data/
+*.secret
+
+# Environment
+.env
+.env.local
+*.env
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log

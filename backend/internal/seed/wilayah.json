@@ -1,0 +1,260 @@
+[
+ {
+  "id": "Ciputat",
+  "nama": "Ciputat",
+  "kelurahan": [
+   {
+    "id": "Cipayung",
+    "nama": "Cipayung"
+   },
+   {
+    "id": "Ciputat",
+    "nama": "Ciputat"
+   },
+   {
+    "id": "Jombang",
+    "nama": "Jombang"
+   },
+   {
+    "id": "Sawah",
+    "nama": "Sawah"
+   },
+   {
+    "id": "Sawah Baru",
+    "nama": "Sawah Baru"
+   },
+   {
+    "id": "Serua",
+    "nama": "Serua"
+   },
+   {
+    "id": "Serua Indah",
+    "nama": "Serua Indah"
+   }
+  ]
+ },
+ {
+  "id": "Ciputat Timur",
+  "nama": "Ciputat Timur",
+  "kelurahan": [
+   {
+    "id": "Cempaka Putih",
+    "nama": "Cempaka Putih"
+   },
+   {
+    "id": "Cireundeu",
+    "nama": "Cireundeu"
+   },
+   {
+    "id": "Pisangan",
+    "nama": "Pisangan"
+   },
+   {
+    "id": "Pondok Ranji",
+    "nama": "Pondok Ranji"
+   },
+   {
+    "id": "Rempoa",
+    "nama": "Rempoa"
+   },
+   {
+    "id": "Rengas",
+    "nama": "Rengas"
+   }
+  ]
+ },
+ {
+  "id": "Pamulang",
+  "nama": "Pamulang",
+  "kelurahan": [
+   {
+    "id": "Bambu Apus",
+    "nama": "Bambu Apus"
+   },
+   {
+    "id": "Benda Baru",
+    "nama": "Benda Baru"
+   },
+   {
+    "id": "Kedaung",
+    "nama": "Kedaung"
+   },
+   {
+    "id": "Pamulang Barat",
+    "nama": "Pamulang Barat"
+   },
+   {
+    "id": "Pamulang Timur",
+    "nama": "Pamulang Timur"
+   },
+   {
+    "id": "Pondok Benda",
+    "nama": "Pondok Benda"
+   },
+   {
+    "id": "Pondok Cabe Ilir",
+    "nama": "Pondok Cabe Ilir"
+   },
+   {
+    "id": "Pondok Cabe Udik",
+    "nama": "Pondok Cabe Udik"
+   }
+  ]
+ },
+ {
+  "id": "Pondok Aren",
+  "nama": "Pondok Aren",
+  "kelurahan": [
+   {
+    "id": "Jurangmangu Barat",
+    "nama": "Jurangmangu Barat"
+   },
+   {
+    "id": "Jurangmangu Timur",
+    "nama": "Jurangmangu Timur"
+   },
+   {
+    "id": "Parigi",
+    "nama": "Parigi"
+   },
+   {
+    "id": "Parigi Baru",
+    "nama": "Parigi Baru"
+   },
+   {
+    "id": "Pondok Aren",
+    "nama": "Pondok Aren"
+   },
+   {
+    "id": "Pondok Betung",
+    "nama": "Pondok Betung"
+   },
+   {
+    "id": "Pondok Jaya",
+    "nama": "Pondok Jaya"
+   },
+   {
+    "id": "Pondok Kacang Barat",
+    "nama": "Pondok Kacang Barat"
+   },
+   {
+    "id": "Pondok Kacang Timur",
+    "nama": "Pondok Kacang Timur"
+   },
+   {
+    "id": "Pondok Karya",
+    "nama": "Pondok Karya"
+   },
+   {
+    "id": "Pondok Pucung",
+    "nama": "Pondok Pucung"
+   }
+  ]
+ },
+ {
+  "id": "Serpong",
+  "nama": "Serpong",
+  "kelurahan": [
+   {
+    "id": "Buaran",
+    "nama": "Buaran"
+   },
+   {
+    "id": "Ciater",
+    "nama": "Ciater"
+   },
+   {
+    "id": "Cilenggang",
+    "nama": "Cilenggang"
+   },
+   {
+    "id": "Lengkong Gudang",
+    "nama": "Lengkong Gudang"
+   },
+   {
+    "id": "Lengkong Gudang Timur",
+    "nama": "Lengkong Gudang Timur"
+   },
+   {
+    "id": "Lengkong Wetan",
+    "nama": "Lengkong Wetan"
+   },
+   {
+    "id": "Rawa Mekar Jaya",
+    "nama": "Rawa Mekar Jaya"
+   },
+   {
+    "id": "Rawabuntu",
+    "nama": "Rawabuntu"
+   },
+   {
+    "id": "Serpong",
+    "nama": "Serpong"
+   }
+  ]
+ },
+ {
+  "id": "Serpong Utara",
+  "nama": "Serpong Utara",
+  "kelurahan": [
+   {
+    "id": "Jelupang",
+    "nama": "Jelupang"
+   },
+   {
+    "id": "Lengkong Karya",
+    "nama": "Lengkong Karya"
+   },
+   {
+    "id": "Pakualam",
+    "nama": "Pakualam"
+   },
+   {
+    "id": "Pakujaya",
+    "nama": "Pakujaya"
+   },
+   {
+    "id": "Pakulonan",
+    "nama": "Pakulonan"
+   },
+   {
+    "id": "Pondok Jagung",
+    "nama": "Pondok Jagung"
+   },
+   {
+    "id": "Pondok Jagung Timur",
+    "nama": "Pondok Jagung Timur"
+   }
+  ]
+ },
+ {
+  "id": "Setu",
+  "nama": "Setu",
+  "kelurahan": [
+   {
+    "id": "Babakan",
+    "nama": "Babakan"
+   },
+   {
+    "id": "Bakti Jaya",
+    "nama": "Bakti Jaya"
+   },
+   {
+    "id": "Kademangan",
+    "nama": "Kademangan"
+   },
+   {
+    "id": "Keranggan",
+    "nama": "Keranggan"
+   },
+   {
+    "id": "Muncul",
+    "nama": "Muncul"
+   },
+   {
+    "id": "Setu",
+    "nama": "Setu"
+   }
+  ]
+ }
+]
