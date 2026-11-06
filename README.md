@@ -4,6 +4,22 @@ Aplikasi web untuk mencatat dan mengelola data rekrutmen di wilayah Kota
 Tangerang Selatan. Dibangun sesuai PRD MVP
 ([`PRD_Rekrutmen_Tangsel_MVP.md`](PRD_Rekrutmen_Tangsel_MVP.md)).
 
+## Dokumen Proyek
+
+| Dokumen | Isi |
+| --- | --- |
+| [`PRD_Rekrutmen_Tangsel_MVP.md`](PRD_Rekrutmen_Tangsel_MVP.md) | Kebutuhan produk & kriteria penerimaan |
+| [`API_CONTRACT.md`](API_CONTRACT.md) | Kontrak API (bentuk request/response, enum, aturan validasi) |
+| [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md) | Rencana pengembangan + status per item + traceability ke PRD |
+| [`TESTING_PLAN.md`](TESTING_PLAN.md) | Rencana pengujian + daftar test + checklist smoke test |
+| [`DEPLOYMENT_PLAN.md`](DEPLOYMENT_PLAN.md) | Rencana deployment + prosedur rilis/rollback + checklist pra-rilis |
+
+Ketiga dokumen plan (`DEVELOPMENT_`, `TESTING_`, `DEPLOYMENT_PLAN.md`) berisi
+status **per item** dengan penanda ✅ (selesai & terverifikasi), 🔧 (sedang
+dikerjakan), dan ⬜ (belum). Gunakan ketiganya sebagai catatan checkpoint:
+kalau proses terhenti, item ✅ terakhir sebelum titik berhenti adalah posisi
+kemajuan yang sudah aman.
+
 ## Fitur
 
 - Form tambah / ubah data rekrutmen dengan validasi di frontend dan backend.
