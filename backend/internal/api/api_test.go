@@ -190,6 +190,54 @@ func TestRekrutmenCRUDLifecycle(t *testing.T) {
 	}
 }
 
+// PRD section 9: the record must carry created_at/updated_at and the user
+// who made the change. The request body carries only the editable fields, so
+// an update must preserve the stored creation audit instead of zeroing it.
+func TestUpdatePreservesCreationAuditFields(t *testing.T) {
+	e := newTestEnv(t)
+	e.login("admin", "admin123")
+
+	var created model.Rekrutmen
+	if code := e.request(http.MethodPost, "/api/rekrutmen", validBody(), &created); code != http.StatusCreated {
+		t.Fatalf("create: expected 201, got %d", code)
+	}
+	if created.CreatedAt.IsZero() {
+		t.Fatal("expected a non-zero created_at on the created record")
+	}
+
+	body := validBody()
+	body["nama"] = "Ahmad Fauzi Update"
+	var updated model.Rekrutmen
+	if code := e.request(http.MethodPut, "/api/rekrutmen/"+created.ID, body, &updated); code != http.StatusOK {
+		t.Fatal("update failed")
+	}
+
+	if updated.CreatedAt.IsZero() {
+		t.Error("created_at was wiped by the update")
+	}
+	if !updated.CreatedAt.Equal(created.CreatedAt) {
+		t.Errorf("created_at changed: got %v, want %v", updated.CreatedAt, created.CreatedAt)
+	}
+	if updated.CreatedBy != "admin" {
+		t.Errorf("created_by was wiped by the update: got %q", updated.CreatedBy)
+	}
+	if updated.UpdatedBy != "admin" {
+		t.Errorf("expected updated_by=admin, got %q", updated.UpdatedBy)
+	}
+	if updated.UpdatedAt.Before(updated.CreatedAt) {
+		t.Errorf("updated_at %v is earlier than created_at %v", updated.UpdatedAt, updated.CreatedAt)
+	}
+
+	// The persisted record must keep the audit trail too, not just the response.
+	var got model.Rekrutmen
+	if code := e.request(http.MethodGet, "/api/rekrutmen/"+created.ID, nil, &got); code != http.StatusOK {
+		t.Fatal("get failed")
+	}
+	if got.CreatedBy != "admin" || got.CreatedAt.IsZero() {
+		t.Errorf("stored record lost its creation audit: %+v", got)
+	}
+}
+
 // PRD acceptance: "Nomor Whatsapp bersifat unik untuk setiap orang".
 func TestDuplicateWhatsAppReturnsConflict(t *testing.T) {
 	e := newTestEnv(t)

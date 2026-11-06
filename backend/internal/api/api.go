@@ -528,6 +528,21 @@ func (s *Server) handleUpdateRekrutmen(w http.ResponseWriter, r *http.Request, u
 	}
 	id := r.PathValue("id")
 	rec.ID = id
+
+	// The audit fields are owned by the server, not the client: the request
+	// body carries only the editable fields, so preserve the stored values
+	// instead of overwriting them with zero values.
+	prev, err := s.Store().GetRekrutmen(id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "data tidak ditemukan")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
+		return
+	}
+	rec.CreatedAt = prev.CreatedAt
+	rec.CreatedBy = prev.CreatedBy
 	rec.UpdatedAt = time.Now().UTC()
 	rec.UpdatedBy = user.Username
 
