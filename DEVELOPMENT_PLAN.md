@@ -37,13 +37,13 @@ perubahan yang menggantung.
 | Fase | Selesai | Sedang | Belum | Total |
 |---|---|---|---|---|
 | F1 — Fondasi & model data | 8 | 0 | 0 | 8 |
-| F2 — API backend | 22 | 0 | 4 | 26 |
+| F2 — API backend | 23 | 0 | 4 | 27 |
 | F3 — Penyimpanan | 10 | 0 | 2 | 12 |
 | F4 — Frontend | 27 | 0 | 4 | 31 |
 | F5 — Keamanan | 4 | 0 | 7 | 11 |
 | F6 — Kualitas & CI | 2 | 0 | 6 | 8 |
 | F7 — Fitur pelengkap PRD | 0 | 0 | 7 | 7 |
-| **Total** | **73** | **0** | **30** | **103** |
+| **Total** | **74** | **0** | **30** | **104** |
 
 Status codebase: **build hijau, test hijau, siap didemokan** — belum siap
 diproduksi karena F5 (keamanan) dan F6 (CI) masih kosong.
@@ -70,6 +70,8 @@ diproduksi karena F5 (keamanan) dan F6 (CI) masih kosong.
 | 2026-11-06 | Frontend **tidak** memakai library validasi; aturan diduplikasi dari `constants.js` | API sudah jadi sumber kebenaran; menambah dependensi hanya memperbesar bundle |
 | 2026-11-06 | `no_wa` disimpan sebagai `string`, bukan angka | PRD §4 — agar angka nol di awal tidak hilang (`validate_test.go:70` mengunci ini) |
 | 2026-11-06 | UPLS/UPLM jadi **satu** field `upl` dengan radio group | PRD §10 butir 176 — "user secara opsional bisa memilih salah satu" |
+| 2026-11-09 | Enum `metode` jadi **3 opsi**: `Halaqoh`, `Program Antara`, `Dakwah Fardiyah` | Koreksi pemilik produk; "Program" + "Antara" sebelumnya terpisah. Nilai lama tetap diterima dan dinormalisasi, tidak ada data hilang |
+| 2026-11-09 | Normalisasi enum di **4 lapisan** (validasi, ketiga store, frontend) | Data lama bisa datang dari storage yang sudah terisi, bukan hanya dari form baru |
 
 ---
 
@@ -102,6 +104,7 @@ Handler: `backend/internal/api/api.go`. Semua 17 route terdaftar di
 | D-28 | Pesan validasi berbahasa Indonesia | ✅ | konsisten di seluruh respons |
 | D-29 | **Fix: `PUT` menghapus jejak audit** | ✅ | `api.go:531-545`; regresi test `api_test.go:196` |
 | D-30 | Sinkronisasi frontend↔backend saat field berubah | ✅ | `API_CONTRACT.md` diperbarui bersama kode |
+| D-104 | **Fix: enum `metode` — "Program" + "Antara" → "Program Antara"** | ✅ | `model.go:9` (3 opsi); normalisasi legacy di `validate.go`, ketiga store, dan frontend; regresi test `TestMetodeProgramAntaraIsStoredAndFilterable` |
 | D-31 | Endpoint ganti password | ⬜ | tidak ada; `auth.go` hanya punya verify/hash |
 | D-32 | Manajemen pengguna (tambah/hapus petugas) | ⬜ | user hanya dari `auth/users.go` |
 | D-33 | Rate limiting pada `POST /api/login` | ⬜ | lihat D-83 |

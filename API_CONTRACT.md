@@ -75,7 +75,7 @@ Record:
 
 Enums:
 - `tingkat_penerimaan`: `Sangat Terbuka` | `Terbuka` | `Netral` | `Kurang Terbuka` | `Tertutup`
-- `metode`: `Halaqoh` | `Program` | `Antara` | `Dakwah Fardiyah`
+- `metode`: `Halaqoh` | `Program Antara` | `Dakwah Fardiyah`
 - `status`: `Berhasil` | `Proses` | `Pending` | `Gagal`
 - `upl`: `""` | `UPLS` | `UPLM`
 
@@ -95,6 +95,8 @@ Enums:
 - `kelurahan` — optional, but if given must belong to `kecamatan`
 - `aktivitas` — required, must exist in master aktivitas
 - `tingkat_penerimaan`, `metode`, `status` — required, must be in enum above
+- `metode` — the retired values `Program` and `Antara` are still accepted on
+  write and on filter, and are normalized to `Program Antara`
 - `upl` — optional, must be `""`, `UPLS`, or `UPLM`
 
 ### Error shape

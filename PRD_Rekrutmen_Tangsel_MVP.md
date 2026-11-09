@@ -72,7 +72,7 @@ profesional, dan responsif.
                                                   Tertutup.
 
   Metode                  Picklist                **Wajib**; Halaqoh,
-                                                  Program, Antara, Dakwah
+                                                  Program Antara, Dakwah
                                                   Fardiyah.
 
   Status                  Picklist                **Wajib**; Berhasil,

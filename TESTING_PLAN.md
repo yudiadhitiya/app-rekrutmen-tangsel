@@ -30,18 +30,18 @@ menuntut test baru akan dicatat di bagian [5. Matriks Coverage](#5-matriks-cover
 
 | Lapisan | Sudah ada & lulus | Belum ada | Total | Catatan |
 |---|---|---|---|---|
-| Unit — validasi | 13 | 0 | 13 | coverage 81.0% |
-| Integrasi — API | 17 | 0 | 17 | coverage 63.1% |
-| Integrasi — store local | 12 | 0 | 12 | coverage 86.5% |
-| Integrasi — store sheets | 6 | 0 | 6 | coverage 78.7% |
-| Integrasi — store supabase | 5 | 0 | 5 | coverage 51.8% |
+| Unit — validasi | 15 | 0 | 15 | coverage 81.4% |
+| Integrasi — API | 18 | 0 | 18 | coverage 63.1% |
+| Integrasi — store local | 14 | 0 | 14 | coverage 86.9% |
+| Integrasi — store sheets | 6 | 0 | 6 | coverage 78.8% |
+| Integrasi — store supabase | 5 | 0 | 5 | coverage 51.4% |
 | Unit — auth / settings / seed / model | 0 | 4 | 4 | **0% coverage, tanpa test file** |
 | Unit — frontend | 0 | 2 | 2 | **tidak ada test runner** |
 | E2E + responsif + a11y | 0 | 4 | 4 | belum ada |
 | Integrasi provider sungguhan | 0 | 2 | 2 | mock `httptest` saja |
 | Keamanan | 0 | 3 | 3 | cookie `Secure`, rate limit, batas `limit` |
 | Lainnya (kontrak, ekspor/impor, migrasi, performa, beban, browser, restore) | 0 | 7 | 7 | lihat §6 |
-| **Total** | **53** | **22** | **75** | |
+| **Total** | **58** | **22** | **80** | |
 
 Kondisi sekarang: **semua test yang ada lulus** (`go test ./...` → 5 paket ok,
 `npm run build` → sukses). Yang belum ada: test frontend, E2E, dan unit test
@@ -77,11 +77,11 @@ npm run build
 ### Baseline terukur (2026-11-06)
 
 ```
-ok  rekrutmen-tangsel/backend/internal/api              4.014s  coverage: 63.1%
-ok  rekrutmen-tangsel/backend/internal/store/local      0.341s  coverage: 86.5%
-ok  rekrutmen-tangsel/backend/internal/store/sheets     3.378s  coverage: 78.7%
-ok  rekrutmen-tangsel/backend/internal/store/supabase   0.145s  coverage: 51.8%
-ok  rekrutmen-tangsel/backend/internal/validate         0.050s  coverage: 81.0%
+ok  rekrutmen-tangsel/backend/internal/api              5.028s  coverage: 63.1%
+ok  rekrutmen-tangsel/backend/internal/store/local      0.555s  coverage: 86.9%
+ok  rekrutmen-tangsel/backend/internal/store/sheets     4.620s  coverage: 78.8%
+ok  rekrutmen-tangsel/backend/internal/store/supabase   0.176s  coverage: 51.4%
+ok  rekrutmen-tangsel/backend/internal/validate         0.098s  coverage: 81.4%
 ```
 
 Paket tanpa test file: `cmd/server`, `internal/auth`, `internal/model`,
@@ -91,7 +91,7 @@ Paket tanpa test file: `cmd/server`, `internal/auth`, `internal/model`,
 
 ## 4. Test yang sudah ada
 
-### 4.1 Validasi — `backend/internal/validate/validate_test.go` (13 test, 81.0%)
+### 4.1 Validasi — `backend/internal/validate/validate_test.go` (15 test, 81.4%)
 
 | # | Test | Mengunci aturan |
 |---|---|---|
@@ -108,69 +108,74 @@ Paket tanpa test file: `cmd/server`, `internal/auth`, `internal/model`,
 | T-11 | `TestEnumValuesMustBeValid` | PRD §10 butir 6 |
 | T-12 | `TestUPLAcceptsEmptyUPLSorUPLM` | PRD §10 butir 7 & 11 |
 | T-13 | `TestFieldsAreTrimmed` | input di-trim |
+| T-14 | `TestMetodeOptionsAreTheThreeCurrentValues` | enum `metode` = 3 opsi (**regresi D-104**) |
+| T-15 | `TestRetiredMetodeSpellingsAreNormalized` | "Program"/"Antara" diterima & dinormalisasi |
 
-### 4.2 API — `backend/internal/api/api_test.go` (17 test, 63.1%)
-
-| # | Test | Mengunci |
-|---|---|---|
-| T-14 | `TestLoginSetsSessionAndMeReturnsUser` | alur login + `/me` |
-| T-15 | `TestLoginRejectsBadPassword` | password salah → ditolak |
-| T-16 | `TestProtectedRoutesRequireAuth` | tanpa sesi → 401 |
-| T-17 | `TestRekrutmenCRUDLifecycle` | PRD §10 butir 1 (lengkap) |
-| T-18 | `TestUpdatePreservesCreationAuditFields` | **regresi D-29** — jejak audit bertahan |
-| T-19 | `TestDuplicateWhatsAppReturnsConflict` | PRD §10 butir 12 |
-| T-20 | `TestCheckWhatsAppReportsExistence` | PRD §9 — peringatan sebelum simpan |
-| T-21 | `TestValidationErrorsAreReportedPerField` | bentuk respons `{error, fields}` |
-| T-22 | `TestWilayahEndpointReturnsSevenKecamatan` | 7 kecamatan |
-| T-23 | `TestAktivitasMasterIsAdminOnly` | PRD §10 butir 14 — hak admin |
-| T-24 | `TestPetugasCannotChangeMasterAktivitas` | petugas ditolak |
-| T-25 | `TestPetugasCanCreateRekrutmen` | petugas boleh CRUD rekrutmen |
-| T-26 | `TestSettingsRequireAdmin` | pengaturan khusus admin |
-| T-27 | `TestSettingsSwitchProvider` | PRD §10 butir 13 |
-| T-28 | `TestSearchAndFilter` | pencarian + filter (PRD §6) |
-| T-29 | `TestAktivitasInUseCannotBeDeleted` | 409 — aktivitas terpakai |
-| T-30 | `TestLogoutClearsSession` | logout membersihkan sesi |
-
-### 4.3 Store local — `backend/internal/store/local/store_test.go` (12 test, 86.5%)
+### 4.2 API — `backend/internal/api/api_test.go` (18 test, 63.1%)
 
 | # | Test | Mengunci |
 |---|---|---|
-| T-31 | `TestCreateRejectsDuplicateWhatsApp` | unikensi saat create |
-| T-32 | `TestUpdateRejectsDuplicateWhatsApp` | unikensi saat update |
-| T-33 | `TestUpdateWithSameWhatsAppSucceeds` | update dengan WA sendiri tetap boleh |
-| T-34 | `TestListFilters` | filter Works di provider |
-| T-35 | `TestListPagination` | paginasi benar |
-| T-36 | `TestFindByWhatsApp` | lookup by WA |
-| T-37 | `TestDeleteRekrutmen` | hapus |
-| T-38 | `TestAktivitasMasterCRUD` | CRUD master aktivitas |
-| T-39 | `TestAktivitasRenameCascadesToRekrutmen` | cascade rename |
-| T-40 | `TestDeleteAktivitasInUseFails` | proteksi hapus |
-| T-41 | `TestCreateAktivitasRejectsDuplicateName` | nama aktivitas unik |
-| T-42 | `TestDataPersistsAcrossReopen` | data bertahan setelah store ditutup & dibuka ulang |
+| T-16 | `TestLoginSetsSessionAndMeReturnsUser` | alur login + `/me` |
+| T-17 | `TestLoginRejectsBadPassword` | password salah → ditolak |
+| T-18 | `TestProtectedRoutesRequireAuth` | tanpa sesi → 401 |
+| T-19 | `TestRekrutmenCRUDLifecycle` | PRD §10 butir 1 (lengkap) |
+| T-20 | `TestUpdatePreservesCreationAuditFields` | **regresi D-29** — jejak audit bertahan |
+| T-21 | `TestMetodeProgramAntaraIsStoredAndFilterable` | **regresi D-104** — metode tersimpan & terfilter |
+| T-22 | `TestDuplicateWhatsAppReturnsConflict` | PRD §10 butir 12 |
+| T-23 | `TestCheckWhatsAppReportsExistence` | PRD §9 — peringatan sebelum simpan |
+| T-24 | `TestValidationErrorsAreReportedPerField` | bentuk respons `{error, fields}` |
+| T-25 | `TestWilayahEndpointReturnsSevenKecamatan` | 7 kecamatan |
+| T-26 | `TestAktivitasMasterIsAdminOnly` | PRD §10 butir 14 — hak admin |
+| T-27 | `TestPetugasCannotChangeMasterAktivitas` | petugas ditolak |
+| T-28 | `TestPetugasCanCreateRekrutmen` | petugas boleh CRUD rekrutmen |
+| T-29 | `TestSettingsRequireAdmin` | pengaturan khusus admin |
+| T-30 | `TestSettingsSwitchProvider` | PRD §10 butir 13 |
+| T-31 | `TestSearchAndFilter` | pencarian + filter (PRD §6) |
+| T-32 | `TestAktivitasInUseCannotBeDeleted` | 409 — aktivitas terpakai |
+| T-33 | `TestLogoutClearsSession` | logout membersihkan sesi |
 
-### 4.4 Store Google Sheets — `backend/internal/store/sheets/store_test.go` (6 test, 78.7%)
+### 4.3 Store local — `backend/internal/store/local/store_test.go` (14 test, 86.9%)
 
 | # | Test | Mengunci |
 |---|---|---|
-| T-43 | `TestSheetsEnsureTabsCreatesHeaders` | tab & header dibuat otomatis |
-| T-44 | `TestSheetsRekrutmenCRUD` | CRUD di Sheets |
-| T-45 | `TestSheetsDeleteKeepsOtherRowsIntact` | hapus tidak memotong baris lain |
-| T-46 | `TestSheetsListAndFilter` | list + filter di Sheets |
-| T-47 | `TestSheetsFindByWhatsApp` | lookup by WA |
-| T-48 | `TestSheetsAktivitasMaster` | master aktivitas di Sheets |
+| T-34 | `TestCreateRejectsDuplicateWhatsApp` | unikensi saat create |
+| T-35 | `TestUpdateRejectsDuplicateWhatsApp` | unikensi saat update |
+| T-36 | `TestUpdateWithSameWhatsAppSucceeds` | update dengan WA sendiri tetap boleh |
+| T-37 | `TestListFilters` | filter Works di provider |
+| T-38 | `TestListPagination` | paginasi benar |
+| T-39 | `TestFindByWhatsApp` | lookup by WA |
+| T-40 | `TestDeleteRekrutmen` | hapus |
+| T-41 | `TestAktivitasMasterCRUD` | CRUD master aktivitas |
+| T-42 | `TestAktivitasRenameCascadesToRekrutmen` | cascade rename |
+| T-43 | `TestDeleteAktivitasInUseFails` | proteksi hapus |
+| T-44 | `TestCreateAktivitasRejectsDuplicateName` | nama aktivitas unik |
+| T-45 | `TestRetiredMetodeIsMigratedOnLoad` | **regresi D-104** — data lama dimigrasi saat store dibuka |
+| T-46 | `TestFilterByProgramAntaraMatchesRetiredSpellings` | **regresi D-104** — filter cocok dengan nilai lama |
+| T-47 | `TestDataPersistsAcrossReopen` | data bertahan setelah store ditutup & dibuka ulang |
+
+### 4.4 Store Google Sheets — `backend/internal/store/sheets/store_test.go` (6 test, 78.8%)
+
+| # | Test | Mengunci |
+|---|---|---|
+| T-48 | `TestSheetsEnsureTabsCreatesHeaders` | tab & header dibuat otomatis |
+| T-49 | `TestSheetsRekrutmenCRUD` | CRUD di Sheets |
+| T-50 | `TestSheetsDeleteKeepsOtherRowsIntact` | hapus tidak memotong baris lain |
+| T-51 | `TestSheetsListAndFilter` | list + filter di Sheets |
+| T-52 | `TestSheetsFindByWhatsApp` | lookup by WA |
+| T-53 | `TestSheetsAktivitasMaster` | master aktivitas di Sheets |
 
 > Test Sheets memakai `httptest` sebagai **fake Google API** (bukan API asli).
-> Lihat T-75 untuk uji integrasi sungguhan.
+> Lihat T-80 untuk uji integrasi sungguhan.
 
-### 4.5 Store Supabase — `backend/internal/store/supabase/store_test.go` (5 test, 51.8%)
+### 4.5 Store Supabase — `backend/internal/store/supabase/store_test.go` (5 test, 51.4%)
 
 | # | Test | Mengunci |
 |---|---|---|
-| T-49 | `TestSupabaseCreateAndGet` | create + get |
-| T-50 | `TestSupabaseUniqueViolationMapsToConflict` | error unique → `ErrDuplicateWA` |
-| T-51 | `TestSupabaseUpdateAndDelete` | update + delete |
-| T-52 | `TestSupabaseFindByWhatsApp` | lookup by WA |
-| T-53 | `TestSupabaseAktivitasMaster` | master aktivitas |
+| T-54 | `TestSupabaseCreateAndGet` | create + get |
+| T-55 | `TestSupabaseUniqueViolationMapsToConflict` | error unique → `ErrDuplicateWA` |
+| T-56 | `TestSupabaseUpdateAndDelete` | update + delete |
+| T-57 | `TestSupabaseFindByWhatsApp` | lookup by WA |
+| T-58 | `TestSupabaseAktivitasMaster` | master aktivitas |
 
 ---
 
@@ -211,28 +216,28 @@ dipulihkan.
 
 | # | Item | Status | Detail |
 |---|---|---|---|
-| T-54 | **Unit test `internal/auth`** | ⬜ | `HashPassword`, `VerifyPassword` (user ada/tidak, password benar/salah), `RandomSecret`, parsing `users.json` |
-| T-55 | **Unit test `internal/settings`** | ⬜ | default `local`, persist, load, file JSON rusak |
-| T-56 | **Unit test `internal/seed`** | ⬜ | integritas 7 kecamatan/54 kelurahan, tidak ada kelurahan tanpa kecamatan |
-| T-57 | **Unit test `internal/model`** | ⬜ | serialisasi JSON, field audit |
-| T-58 | **Test runner frontend** | ⬜ | pasang Vitest + `@vue/test-utils` |
-| T-59 | **Test unit komponen frontend** | ⬜ | `FormView` validasi, `ListView` filter, guard router |
-| T-60 | **Test E2E (Playwright)** | ⬜ | alur PRD §5 end-to-end |
-| T-61 | **Test E2E peran** | ⬜ | petugas tidak bisa masuk menu admin |
-| T-62 | **Test responsif** | ⬜ | viewport mobile, tabel→kartu |
-| T-63 | **Audit a11y** | ⬜ | axe-core di E2E |
-| T-64 | **Integration test Supabase sungguhan** | ⬜ | skip kalau `SUPABASE_URL` kosong |
-| T-65 | **Integration test Sheets sungguhan** | ⬜ | skip kalau `GOOGLE_SHEET_ID` kosong |
-| T-66 | **Test keamanan cookie `Secure`** | ⬜ | terkait D-82 |
-| T-67 | **Test rate limit login** | ⬜ | terkait D-83 |
-| T-68 | **Test batas atas `limit`** | ⬜ | terkait D-88 |
-| T-69 | **Test ekspor/impor** | ⬜ | terkait D-97 |
-| T-70 | **Test kontrak API (schema)** | ⬜ | pastikan respons sesuai `API_CONTRACT.md` |
-| T-71 | **Test naik-turunkan versi (migration)** | ⬜ | bila skema berubah |
-| T-72 | **Benchmark performa list** | ⬜ | data besar (10k+ baris) |
-| T-73 | **Uji beban (load test)** | ⬜ | pra-pemcctlon produksi |
-| T-74 | **Uji kompatibilitas browser** | ⬜ | Chrome/Firefox/Safari/Edge |
-| T-75 | **Uji restore backup** | ⬜ | terkait P-35 |
+| T-59 | **Unit test `internal/auth`** | ⬜ | `HashPassword`, `VerifyPassword` (user ada/tidak, password benar/salah), `RandomSecret`, parsing `users.json` |
+| T-60 | **Unit test `internal/settings`** | ⬜ | default `local`, persist, load, file JSON rusak |
+| T-61 | **Unit test `internal/seed`** | ⬜ | integritas 7 kecamatan/54 kelurahan, tidak ada kelurahan tanpa kecamatan |
+| T-62 | **Unit test `internal/model`** | ⬜ | serialisasi JSON, field audit |
+| T-63 | **Test runner frontend** | ⬜ | pasang Vitest + `@vue/test-utils` |
+| T-64 | **Test unit komponen frontend** | ⬜ | `FormView` validasi, `ListView` filter, guard router |
+| T-65 | **Test E2E (Playwright)** | ⬜ | alur PRD §5 end-to-end |
+| T-66 | **Test E2E peran** | ⬜ | petugas tidak bisa masuk menu admin |
+| T-67 | **Test responsif** | ⬜ | viewport mobile, tabel→kartu |
+| T-68 | **Audit a11y** | ⬜ | axe-core di E2E |
+| T-69 | **Integration test Supabase sungguhan** | ⬜ | skip kalau `SUPABASE_URL` kosong |
+| T-70 | **Integration test Sheets sungguhan** | ⬜ | skip kalau `GOOGLE_SHEET_ID` kosong |
+| T-71 | **Test keamanan cookie `Secure`** | ⬜ | terkait D-82 |
+| T-72 | **Test rate limit login** | ⬜ | terkait D-83 |
+| T-73 | **Test batas atas `limit`** | ⬜ | terkait D-88 |
+| T-74 | **Test ekspor/impor** | ⬜ | terkait D-97 |
+| T-75 | **Test kontrak API (schema)** | ⬜ | pastikan respons sesuai `API_CONTRACT.md` |
+| T-76 | **Test naik-turunkan versi (migration)** | ⬜ | bila skema berubah |
+| T-77 | **Benchmark performa list** | ⬜ | data besar (10k+ baris) |
+| T-78 | **Uji beban (load test)** | ⬜ | pra-pemcctlon produksi |
+| T-79 | **Uji kompatibilitas browser** | ⬜ | Chrome/Firefox/Safari/Edge |
+| T-80 | **Uji restore backup** | ⬜ | terkait P-35 |
 
 ---
 
@@ -297,7 +302,7 @@ Checklist yang dijalankan setelah deploy atau sebelum rilis.aty.
 | Manual | checklist §7 | sebab-akibat + smoke | tiap deploy |
 | Load | k6 / hey | list + create | pra-release |
 
-> Golden-file test kontrak (T-70) sangat berguna di sini: karena
+> Golden-file test kontrak (T-75) sangat berguna di sini: karena
 > `API_CONTRACT.md` adalah sumber kebenaran yang dipakai frontend **dan**
 > backend, test golden memastikan tidak ada diam-diamnya perubahan bentuk
 > respons.
@@ -330,7 +335,7 @@ Checklist yang dijalankan setelah deploy atau sebelum rilis.aty.
 | `go test ./...` | ✅ 5 paket ok |
 | Coverage | api 63.1% · local 86.5% · sheets 78.7% · supabase 51.8% · validate 81.0% |
 | `npm run build` | ✅ sukses |
-| Total test | 53 lulus |
+| Total test | 58 lulus |
 | Test belum ada | 22 item |
 | Test runner frontend | belum ada |
 
@@ -338,7 +343,7 @@ Checklist yang dijalankan setelah deploy atau sebelum rilis.aty.
 
 1. `cd backend && go test -count=1 ./...` — pastikan hijau.
 2. `git status` — cari test yang ditulis tapi belum di-commit (status `🔧`).
-3. Lanjutkan dari `T-54` (unit test auth) — paket dengan celah coverage terbesar
+3. Lanjutkan dari `T-59` (unit test auth) — paket dengan celah coverage terbesar
    dan paling cepat ditulis.
 
 ---
@@ -348,11 +353,11 @@ Checklist yang dijalankan setelah deploy atau sebelum rilis.aty.
 | Target | Cum-bu | Saat |
 |---|---|---|
 | Backend total | ≥ 75% | sebelum rilis |
-| `internal/auth` | ≥ 80% | sebelum rilis (T-54) |
-| `internal/settings` | ≥ 80% | sebelum rilis (T-55) |
+| `internal/auth` | ≥ 80% | sebelum rilis (T-59) |
+| `internal/settings` | ≥ 80% | sebelum rilis (T-60) |
 | `internal/store/supabase` | ≥ 70% | sebelum rilis |
-| Frontend | ≥ 60% | setelah Vitest masuk (T-58) |
-| Kriteria PRD §10 | 100% punya test | sebelum rilis — **sudah 13/14 terpenuhi**, sisa butir 9 (responsif) menunggu T-62 |
+| Frontend | ≥ 60% | setelah Vitest masuk (T-63) |
+| Kriteria PRD §10 | 100% punya test | sebelum rilis — **sudah 13/14 terpenuhi**, sisa butir 9 (responsif) menunggu T-67 |
 
 ---
 
