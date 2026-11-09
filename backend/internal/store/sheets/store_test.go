@@ -315,7 +315,7 @@ func TestSheetsListAndFilter(t *testing.T) {
 	a := &model.Rekrutmen{
 		ID: "r1", Nama: "Budi Santoso", NoWA: "628111111111",
 		Kecamatan: "Ciputat", Kelurahan: "Cipayung", Aktivitas: "Pedagang",
-		TingkatPenerimaan: "Terbuka", Metode: "Program", Status: "Pending",
+		TingkatPenerimaan: "Terbuka", Metode: "Program Antara", Status: "Pending",
 	}
 	b := &model.Rekrutmen{
 		ID: "r2", Nama: "Siti Aminah", NoWA: "628222222222",
@@ -335,7 +335,7 @@ func TestSheetsListAndFilter(t *testing.T) {
 		{"wa", model.Filter{Q: "628111"}, 1},
 		{"kecamatan", model.Filter{Kecamatan: "Ciputat"}, 1},
 		{"kelurahan", model.Filter{Kelurahan: "Buaran"}, 1},
-		{"metode", model.Filter{Metode: "Program"}, 1},
+		{"metode", model.Filter{Metode: "Program Antara"}, 1},
 		{"status", model.Filter{Status: "Pending"}, 1},
 	}
 	for _, c := range cases {

@@ -130,7 +130,18 @@ func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 		q.Set("kelurahan", "eq."+f.Kelurahan)
 	}
 	if f.Metode != "" {
-		q.Set("metode", "eq."+f.Metode)
+		// Use an "in" filter so the retired "Program"/"Antara" spellings still
+		// match the current "Program Antara" option.
+		values := model.MetodeMatchValues(f.Metode)
+		if len(values) == 1 {
+			q.Set("metode", "eq."+f.Metode)
+		} else {
+			quoted := make([]string, 0, len(values))
+			for _, v := range values {
+				quoted = append(quoted, `"`+v+`"`)
+			}
+			q.Set("metode", "in.("+strings.Join(quoted, ",")+")")
+		}
 	}
 	if f.Status != "" {
 		q.Set("status", "eq."+f.Status)
@@ -159,6 +170,7 @@ func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	normalizeRows(rows)
 	total := len(rows)
 	if cr := resp.Header.Get("Content-Range"); cr != "" {
 		// Format: "0-24/120"
@@ -179,6 +191,7 @@ func (s *Store) GetRekrutmen(id string) (*model.Rekrutmen, error) {
 	if _, err := s.do(req, &rows); err != nil {
 		return nil, err
 	}
+	normalizeRows(rows)
 	if len(rows) == 0 {
 		return nil, store.ErrNotFound
 	}
@@ -195,6 +208,7 @@ func (s *Store) FindRekrutmenByWA(noWA string) (*model.Rekrutmen, error) {
 	if _, err := s.do(req, &rows); err != nil {
 		return nil, err
 	}
+	normalizeRows(rows)
 	if len(rows) == 0 {
 		return nil, store.ErrNotFound
 	}
@@ -202,6 +216,7 @@ func (s *Store) FindRekrutmenByWA(noWA string) (*model.Rekrutmen, error) {
 }
 
 func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
+	r.Metode = model.NormalizeMetode(r.Metode)
 	req, err := s.newRequest(context.Background(), http.MethodPost, "/"+tableRekrutmen, r)
 	if err != nil {
 		return err
@@ -218,6 +233,7 @@ func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
 }
 
 func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
+	r.Metode = model.NormalizeMetode(r.Metode)
 	req, err := s.newRequest(context.Background(), http.MethodPatch,
 		"/"+tableRekrutmen+"?id=eq."+url.QueryEscape(r.ID), r)
 	if err != nil {
@@ -382,4 +398,12 @@ func isUniqueViolation(err error) bool {
 	}
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "23505") || strings.Contains(s, "duplicate key")
+}
+
+// normalizeRows folds the retired Metode spellings into "Program Antara" so
+// rows already stored in the database read back with current values.
+func normalizeRows(rows []model.Rekrutmen) {
+	for i := range rows {
+		rows[i].Metode = model.NormalizeMetode(rows[i].Metode)
+	}
 }

@@ -407,7 +407,7 @@ func (s *Server) handleListRekrutmen(w http.ResponseWriter, r *http.Request, use
 		Q:         q.Get("q"),
 		Kecamatan: q.Get("kecamatan"),
 		Kelurahan: q.Get("kelurahan"),
-		Metode:    q.Get("metode"),
+		Metode:    model.NormalizeMetode(q.Get("metode")),
 		Status:    q.Get("status"),
 		Page:      page,
 		Limit:     limit,

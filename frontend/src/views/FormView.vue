@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, ApiError } from '../api'
-import { METODE, STATUS, TINGKAT_PENERIMAAN, UPL_OPTIONS } from '../constants'
+import { METODE, STATUS, TINGKAT_PENERIMAAN, UPL_OPTIONS, normalizeMetode } from '../constants'
 import { toast } from '../toast'
 import { confirmDialog } from '../confirm'
 
@@ -218,7 +218,7 @@ async function loadRecord() {
     form.kelurahan = data.kelurahan || ''
     form.aktivitas = data.aktivitas || ''
     form.tingkat_penerimaan = data.tingkat_penerimaan || ''
-    form.metode = data.metode || ''
+    form.metode = normalizeMetode(data.metode || '')
     form.status = data.status || ''
     form.keterangan = data.keterangan || ''
     form.upl = data.upl || ''

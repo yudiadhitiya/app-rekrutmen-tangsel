@@ -151,6 +151,36 @@ func TestEnumValuesMustBeValid(t *testing.T) {
 	}
 }
 
+// The Metode list has three options; "Program" and "Antara" are retired
+// spellings that fold into "Program Antara".
+func TestMetodeOptionsAreTheThreeCurrentValues(t *testing.T) {
+	want := []string{"Halaqoh", "Program Antara", "Dakwah Fardiyah"}
+	if len(model.Metode) != len(want) {
+		t.Fatalf("expected %d metode options, got %d (%v)", len(want), len(model.Metode), model.Metode)
+	}
+	for i, v := range want {
+		if model.Metode[i] != v {
+			t.Errorf("metode[%d]: expected %q, got %q", i, v, model.Metode[i])
+		}
+	}
+}
+
+// A record submitted with a retired Metode spelling must be accepted and
+// normalized to the current option.
+func TestRetiredMetodeSpellingsAreNormalized(t *testing.T) {
+	for _, old := range []string{"Program", "Antara"} {
+		r := valid()
+		r.Metode = old
+		f := Rekrutmen(r, aktivitasNames)
+		if len(f) != 0 {
+			t.Errorf("metode=%q should be accepted, got %v", old, f)
+		}
+		if r.Metode != "Program Antara" {
+			t.Errorf("metode=%q: expected normalization to %q, got %q", old, "Program Antara", r.Metode)
+		}
+	}
+}
+
 // The UPL field is a single optional radio choice.
 func TestUPLAcceptsEmptyUPLSorUPLM(t *testing.T) {
 	for _, v := range []string{"", "UPLS", "UPLM"} {

@@ -21,7 +21,7 @@ create table if not exists public.rekrutmen (
                         tingkat_penerimaan in ('Sangat Terbuka','Terbuka','Netral',
                                                'Kurang Terbuka','Tertutup')),
   metode              text not null check (
-                        metode in ('Halaqoh','Program','Antara','Dakwah Fardiyah')),
+                        metode in ('Halaqoh','Program Antara','Dakwah Fardiyah')),
   status              text not null check (
                         status in ('Berhasil','Proses','Pending','Gagal')),
   keterangan          text not null default '',
@@ -44,6 +44,19 @@ create index if not exists rekrutmen_metode_idx    on public.rekrutmen (metode);
 create index if not exists rekrutmen_status_idx    on public.rekrutmen (status);
 create index if not exists rekrutmen_created_idx   on public.rekrutmen (created_at desc);
 create index if not exists rekrutmen_aktivitas_idx on public.rekrutmen (aktivitas);
+
+-- Migrasi enum metode: "Program" dan "Antara" digabung menjadi satu pilihan
+-- "Program Antara". Constraint check lama dilepas DULUAN, karena nilai baru
+-- "Program Antara" belum diizinkan oleh constraint lama sehingga UPDATE
+-- akan gagal jika constraint masih aktif.
+alter table public.rekrutmen drop constraint if exists rekrutmen_metode_check;
+
+update public.rekrutmen set metode = 'Program Antara'
+  where metode in ('Program', 'Antara');
+
+alter table public.rekrutmen
+  add constraint rekrutmen_metode_check
+  check (metode in ('Halaqoh','Program Antara','Dakwah Fardiyah'));
 
 -- updated_at diperbarui otomatis setiap kali baris berubah.
 create or replace function public.set_updated_at()

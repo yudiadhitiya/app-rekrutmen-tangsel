@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"testing"
 
@@ -443,6 +444,35 @@ func TestSearchAndFilter(t *testing.T) {
 	e.request(http.MethodGet, "/api/rekrutmen", nil, &out)
 	if out.Total != 2 {
 		t.Errorf("expected 2 total, got %d", out.Total)
+	}
+}
+
+// The Metode list has three options; a record submitted with a retired
+// spelling must be stored as "Program Antara" and be findable by the
+// current filter value.
+func TestMetodeProgramAntaraIsStoredAndFilterable(t *testing.T) {
+	e := newTestEnv(t)
+	e.login("admin", "admin123")
+
+	body := validBody()
+	body["metode"] = "Program"
+	var created model.Rekrutmen
+	if code := e.request(http.MethodPost, "/api/rekrutmen", body, &created); code != http.StatusCreated {
+		t.Fatalf("create: expected 201, got %d", code)
+	}
+	if created.Metode != "Program Antara" {
+		t.Errorf("expected metode normalized to %q, got %q", "Program Antara", created.Metode)
+	}
+
+	// The retired spelling must also be accepted by the filter.
+	for _, filter := range []string{"Program Antara", "Program"} {
+		var out struct {
+			Total int `json:"total"`
+		}
+		e.request(http.MethodGet, "/api/rekrutmen?metode="+url.QueryEscape(filter), nil, &out)
+		if out.Total != 1 {
+			t.Errorf("filter metode=%q: expected 1, got %d", filter, out.Total)
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 package local
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -83,7 +84,7 @@ func TestListFilters(t *testing.T) {
 	a.Nama = "Budi Santoso"
 	a.Kecamatan = "Ciputat"
 	a.Kelurahan = "Cipayung"
-	a.Metode = "Program"
+	a.Metode = "Program Antara"
 	a.Status = "Pending"
 	if err := s.CreateRekrutmen(a); err != nil {
 		t.Fatal(err)
@@ -104,7 +105,7 @@ func TestListFilters(t *testing.T) {
 		{"by wa", model.Filter{Q: "628111"}, 1},
 		{"by kecamatan", model.Filter{Kecamatan: "Ciputat"}, 1},
 		{"by kelurahan", model.Filter{Kelurahan: "Cipayung"}, 1},
-		{"by metode", model.Filter{Metode: "Program"}, 1},
+		{"by metode", model.Filter{Metode: "Program Antara"}, 1},
 		{"by status", model.Filter{Status: "Pending"}, 1},
 		{"no match", model.Filter{Q: "zzz"}, 0},
 	}
@@ -262,6 +263,74 @@ func TestCreateAktivitasRejectsDuplicateName(t *testing.T) {
 	}
 	if err := s.CreateAktivitas(&model.Aktivitas{ID: "a2", Nama: "Pedagang"}); err != store.ErrDuplicateName {
 		t.Fatalf("expected ErrDuplicateName, got %v", err)
+	}
+}
+
+// Records still stored with a retired Metode spelling must be migrated to
+// the current "Program Antara" option when the store is opened.
+func TestRetiredMetodeIsMigratedOnLoad(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rekrutmen.json")
+
+	// Write a file that still holds the retired spellings.
+	legacy := `{"rekrutmen":[{"id":"r1","nama":"Ahmad","no_wa":"628111111111",
+		"kecamatan":"Serpong","aktivitas":"Wiraswasta","tingkat_penerimaan":"Terbuka",
+		"metode":"Program","status":"Berhasil"},
+		{"id":"r2","nama":"Siti","no_wa":"628222222222",
+		"kecamatan":"Serpong","aktivitas":"Wiraswasta","tingkat_penerimaan":"Terbuka",
+		"metode":"Antara","status":"Berhasil"}]}`
+	if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := New(path)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	data, total, err := s.ListRekrutmen(model.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 {
+		t.Fatalf("expected 2 records, got %d", total)
+	}
+	for _, r := range data {
+		if r.Metode != "Program Antara" {
+			t.Errorf("record %s: expected migrated metode, got %q", r.ID, r.Metode)
+		}
+	}
+}
+
+// Filtering by "Program Antara" must also return records still stored with
+// the retired "Program" or "Antara" spelling.
+func TestFilterByProgramAntaraMatchesRetiredSpellings(t *testing.T) {
+	s := newStore(t)
+	for _, noWA := range []string{"628111111111", "628222222222", "628333333333"} {
+		r := rec(noWA)
+		switch noWA {
+		case "628111111111":
+			r.Metode = "Program"
+		case "628222222222":
+			r.Metode = "Antara"
+		default:
+			r.Metode = "Halaqoh"
+		}
+		if err := s.CreateRekrutmen(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	data, total, err := s.ListRekrutmen(model.Filter{Metode: "Program Antara"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2 matching records, got %d", total)
+	}
+	for _, r := range data {
+		if r.Metode != "Program Antara" {
+			t.Errorf("expected normalized metode, got %q", r.Metode)
+		}
 	}
 }
 

@@ -8,7 +8,19 @@ export const TINGKAT_PENERIMAAN = [
   'Tertutup'
 ]
 
-export const METODE = ['Halaqoh', 'Program', 'Antara', 'Dakwah Fardiyah']
+export const METODE = ['Halaqoh', 'Program Antara', 'Dakwah Fardiyah']
+
+// Maps the retired Metode values to the current "Program Antara" option.
+const METODE_LAMA = {
+  Program: 'Program Antara',
+  Antara: 'Program Antara'
+}
+
+// NormalizeMetode folds a retired Metode value into its current replacement.
+// Values that are already current are returned unchanged.
+export function normalizeMetode(value) {
+  return METODE_LAMA[value] || value
+}
 
 export const STATUS = ['Berhasil', 'Proses', 'Pending', 'Gagal']
 

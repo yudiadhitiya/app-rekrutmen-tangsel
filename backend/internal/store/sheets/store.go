@@ -444,7 +444,7 @@ func valuesToRekrutmen(row sheetRow) model.Rekrutmen {
 		Kelurahan:         row["kelurahan"],
 		Aktivitas:         row["aktivitas"],
 		TingkatPenerimaan: row["tingkat_penerimaan"],
-		Metode:            row["metode"],
+		Metode:            model.NormalizeMetode(row["metode"]),
 		Status:            row["status"],
 		Keterangan:        row["keterangan"],
 		UPL:               row["upl"],
@@ -490,7 +490,7 @@ func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 		if f.Kelurahan != "" && r.Kelurahan != f.Kelurahan {
 			continue
 		}
-		if f.Metode != "" && r.Metode != f.Metode {
+		if f.Metode != "" && !model.MetodeMatches(r.Metode, f.Metode) {
 			continue
 		}
 		if f.Status != "" && r.Status != f.Status {
@@ -557,6 +557,7 @@ func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
 	} else if err != store.ErrNotFound {
 		return err
 	}
+	r.Metode = model.NormalizeMetode(r.Metode)
 	return s.appendRow(ctx, SheetRekrutmen, rekrutmenToValues(*r))
 }
 
@@ -573,6 +574,7 @@ func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 	}
 	for _, e := range rows {
 		if e.row["id"] == r.ID {
+			r.Metode = model.NormalizeMetode(r.Metode)
 			return s.updateRow(ctx, SheetRekrutmen, e.num, rekrutmenToValues(*r))
 		}
 	}

@@ -35,6 +35,10 @@ func Rekrutmen(r *model.Rekrutmen, aktivitasNames []string) Fields {
 	r.Keterangan = strings.TrimSpace(r.Keterangan)
 	r.UPL = strings.TrimSpace(r.UPL)
 
+	// Accept the retired "Program"/"Antara" spellings and fold them into the
+	// current "Program Antara" option.
+	r.Metode = model.NormalizeMetode(strings.TrimSpace(r.Metode))
+
 	if r.Nama == "" {
 		f["nama"] = "nama wajib diisi"
 	}

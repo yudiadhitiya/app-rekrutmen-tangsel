@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
-import { METODE, STATUS, tingkatTone, statusTone } from '../constants'
+import { METODE, STATUS, tingkatTone, statusTone, normalizeMetode } from '../constants'
 import { toast } from '../toast'
 import { confirmDialog } from '../confirm'
 
@@ -83,7 +83,12 @@ async function loadRows() {
       page: page.value,
       limit: limit.value
     })
-    rows.value = (data && data.data) || []
+    // Fold the retired Metode values into the current option so old records
+    // still match the "Program Antara" filter and show the right label.
+    rows.value = ((data && data.data) || []).map((row) => ({
+      ...row,
+      metode: normalizeMetode(row.metode)
+    }))
     total.value = Number((data && data.total) || 0)
     if (page.value > totalPages.value) page.value = totalPages.value
   } catch (err) {

@@ -50,7 +50,27 @@ func (s *Store) load() error {
 		s.state = fileState{}
 		return nil
 	}
-	return json.Unmarshal(b, &s.state)
+	if err := json.Unmarshal(b, &s.state); err != nil {
+		return err
+	}
+	// Migrate records still holding the retired Metode spellings.
+	if s.migrateMetode() {
+		return s.save()
+	}
+	return nil
+}
+
+// migrateMetode folds the retired Metode values into "Program Antara" and
+// reports whether anything changed.
+func (s *Store) migrateMetode() bool {
+	changed := false
+	for i := range s.state.Rekrutmen {
+		if replacement, ok := model.MetodeLama[s.state.Rekrutmen[i].Metode]; ok {
+			s.state.Rekrutmen[i].Metode = replacement
+			changed = true
+		}
+	}
+	return changed
 }
 
 func (s *Store) save() error {
@@ -92,7 +112,7 @@ func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 		if f.Kelurahan != "" && r.Kelurahan != f.Kelurahan {
 			continue
 		}
-		if f.Metode != "" && r.Metode != f.Metode {
+		if f.Metode != "" && !model.MetodeMatches(r.Metode, f.Metode) {
 			continue
 		}
 		if f.Status != "" && r.Status != f.Status {
@@ -158,6 +178,7 @@ func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
 			return store.ErrDuplicateWA
 		}
 	}
+	r.Metode = model.NormalizeMetode(r.Metode)
 	s.state.Rekrutmen = append(s.state.Rekrutmen, *r)
 	return s.save()
 }
@@ -170,6 +191,7 @@ func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 			return store.ErrDuplicateWA
 		}
 	}
+	r.Metode = model.NormalizeMetode(r.Metode)
 	for i := range s.state.Rekrutmen {
 		if s.state.Rekrutmen[i].ID == r.ID {
 			s.state.Rekrutmen[i] = *r
