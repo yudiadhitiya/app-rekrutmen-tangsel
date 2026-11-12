@@ -16,6 +16,16 @@ backend/data/
 .env.local
 *.env
 
+# Google service-account credentials: the private key grants full read/write
+# access to every spreadsheet shared with the account. Keep it out of the repo.
+backend/secrets/
+backend/.secrets/
+*.service-account.json
+google-key*.json
+gcp-*.json
+credentials.json
+service-account*.json
+
 # Editor / OS
 .DS_Store
 .idea/

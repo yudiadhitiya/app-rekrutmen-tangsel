@@ -32,7 +32,9 @@ export async function login(username, password) {
   const data = await api.login(username, password)
   auth.user = data && data.user ? data.user : null
   auth.loaded = true
-  return auth.user
+  // The response also reports whether the account was migrated from the
+  // previous application, so the interface can tell the user about it.
+  return data
 }
 
 export async function logout() {

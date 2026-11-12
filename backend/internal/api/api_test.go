@@ -511,3 +511,113 @@ func TestLogoutClearsSession(t *testing.T) {
 		t.Errorf("expected 401 after logout, got %d", code)
 	}
 }
+
+// legacyAuthenticator stands in for the accounts of the previous
+// application.
+type legacyAuthenticator struct {
+	user  model.User
+	ok    bool
+	calls int
+}
+
+func (l *legacyAuthenticator) VerifyLegacy(username, password string) (model.User, bool, error) {
+	l.calls++
+	return l.user, l.ok, nil
+}
+
+func TestLoginWithLegacyAccount(t *testing.T) {
+	dir := t.TempDir()
+	users := auth.DefaultUsers()
+	authMgr := auth.NewManager(users, []byte("test-secret"))
+	authMgr.SetUsersPath(filepath.Join(dir, "users.json"))
+	legacy := &legacyAuthenticator{
+		ok:   true,
+		user: model.User{ID: "u1", Username: "anggota01", Nama: "Anggota Satu", Role: model.RolePetugas},
+	}
+	authMgr.SetLegacyAuthenticator(legacy)
+
+	setStore, err := settings.NewStore(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, err := New(Config{DataDir: dir}, authMgr, setStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	jar, err := cookieJar()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Jar: jar}
+
+	body, _ := json.Marshal(map[string]string{"username": "anggota01", "password": "rahasia"})
+	resp, err := client.Post(ts.URL+"/api/login", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("login warisan harus berhasil, dapat %d", resp.StatusCode)
+	}
+	var out struct {
+		User     model.User `json:"user"`
+		Migrated bool       `json:"migrated"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.User.Username != "anggota01" {
+		t.Errorf("user: %+v", out.User)
+	}
+	if !out.Migrated {
+		t.Error("login warisan yang berhasil harus ditandai sudah dimigrasi")
+	}
+
+	// The account is stored locally now, so a second login does not need the
+	// sheet any more.
+	callsBefore := legacy.calls
+	body, _ = json.Marshal(map[string]string{"username": "anggota01", "password": "rahasia"})
+	resp2, err := client.Post(ts.URL+"/api/login", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("login kedua harus berhasil, dapat %d", resp2.StatusCode)
+	}
+	if legacy.calls != callsBefore {
+		t.Error("akun yang sudah dimigrasi tidak boleh menyentuh sheet lagi")
+	}
+}
+
+func TestLoginWithWrongLegacyPassword(t *testing.T) {
+	dir := t.TempDir()
+	users := auth.DefaultUsers()
+	authMgr := auth.NewManager(users, []byte("test-secret"))
+	authMgr.SetUsersPath(filepath.Join(dir, "users.json"))
+	authMgr.SetLegacyAuthenticator(&legacyAuthenticator{ok: false})
+
+	setStore, err := settings.NewStore(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, err := New(Config{DataDir: dir}, authMgr, setStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	body, _ := json.Marshal(map[string]string{"username": "anggota01", "password": "salah"})
+	resp, err := http.Post(ts.URL+"/api/login", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("password salah harus ditolak, dapat %d", resp.StatusCode)
+	}
+}

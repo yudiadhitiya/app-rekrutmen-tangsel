@@ -114,6 +114,12 @@ Prinsip:
 | `SUPABASE_API_KEY` | — | bila pakai Supabase | service-role key (rahasia) |
 | `GOOGLE_SHEET_ID` | — | bila pakai Sheets | ID spreadsheet |
 | `GOOGLE_KEY_FILE` | — | bila pakai Sheets | path file JSON service account |
+| `GOOGLE_SHEETS_MODE` | `app` | tidak | `app` atau `form` (tab respons formulir) |
+| `GOOGLE_SHEETS_TAB_REKRUTMEN` | `Rekrutmen` | tidak | nama tab data rekrutmen |
+| `GOOGLE_SHEETS_TAB_AKTIVITAS` | `Aktivitas` | tidak | nama tab master aktivitas |
+| `GOOGLE_SHEETS_TAB_SUMBER` | `Form Responses 1` | tidak | nama tab sumber untuk impor |
+| `GOOGLE_SHEETS_TAB_PENGGUNA` | `USERS` | tidak | nama tab akun aplikasi lama |
+| `LEGACY_AUTH_MODE` | `upgrade` | tidak | `upgrade`, `sheet`, atau `off` |
 | `APP_ROOT` | `.` | ya | root aplikasi untuk path relatif |
 
 ---

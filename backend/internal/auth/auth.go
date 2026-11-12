@@ -16,7 +16,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"rekrutmen-tangsel/backend/internal/model"
@@ -32,6 +34,28 @@ const (
 // ErrInvalidCredentials is returned for a bad username or password.
 var ErrInvalidCredentials = errors.New("username atau password salah")
 
+// ErrNoRegistrar is returned when no account store for new members is
+// configured, so a self-registration cannot be written anywhere.
+var ErrNoRegistrar = errors.New("pendaftaran anggota belum tersedia")
+
+// LegacyAuthenticator verifies credentials against an external account store,
+// such as the USERS sheet of the previous application.
+//
+// It is consulted only for usernames that are not known locally, so an
+// account that was already migrated always uses the local hash.
+type LegacyAuthenticator interface {
+	// VerifyLegacy reports whether the credentials are accepted, and returns
+	// the account as a user of this application.
+	VerifyLegacy(username, password string) (model.User, bool, error)
+}
+
+// Registrar creates a new account in an external account store, such as the
+// USERS sheet of the previous application.
+type Registrar interface {
+	// RegisterUser stores a new member account.
+	RegisterUser(reg model.Registration) error
+}
+
 // User is a stored account with a password hash.
 type User struct {
 	model.User
@@ -41,8 +65,19 @@ type User struct {
 
 // Manager authenticates users and issues session cookies.
 type Manager struct {
-	users  map[string]User // keyed by username
+	mu     sync.RWMutex
+	users  map[string]User // keyed by lowercase username
 	secret []byte
+
+	// legacy verifies accounts of the previous application.
+	legacy LegacyAuthenticator
+
+	// registrar stores new member accounts.
+	registrar Registrar
+
+	// path is the file the accounts are stored in. It is empty when the
+	// manager must not write to disk.
+	path string
 }
 
 // NewManager builds a Manager from a list of users and a signing secret.
@@ -52,6 +87,145 @@ func NewManager(users []User, secret []byte) *Manager {
 		m.users[strings.ToLower(u.Username)] = u
 	}
 	return m
+}
+
+// SetLegacyAuthenticator sets the source that verifies accounts of the
+// previous application.
+func (m *Manager) SetLegacyAuthenticator(a LegacyAuthenticator) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.legacy = a
+}
+
+// SetRegistrar sets the store that keeps new member accounts.
+func (m *Manager) SetRegistrar(r Registrar) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.registrar = r
+}
+
+// CanRegister reports whether new member accounts can be stored.
+func (m *Manager) CanRegister() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.registrar != nil
+}
+
+// RegisterUser stores a new member account.
+// The account is written to the account store of the previous application,
+// so the member can sign in with it in both applications. It stays there
+// until the first sign in, which migrates it to the local store.
+func (m *Manager) RegisterUser(reg model.Registration) error {
+	m.mu.RLock()
+	registrar := m.registrar
+	m.mu.RUnlock()
+
+	if registrar == nil {
+		return ErrNoRegistrar
+	}
+	return registrar.RegisterUser(reg)
+}
+
+// SetUsersPath sets the file the accounts are stored in, so a migrated
+// account can be written to it.
+func (m *Manager) SetUsersPath(path string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.path = path
+}
+
+// VerifyLogin checks a password against the stored accounts.
+//
+// Local accounts are checked first. When the username is unknown locally,
+// the accounts of the previous application are consulted, so a user can sign
+// in with the credentials they already had.
+//
+// The returned bool reports whether the login came from the previous
+// application, which means the account can be migrated.
+func (m *Manager) VerifyLogin(username, password string) (model.User, bool, error) {
+	key := strings.ToLower(strings.TrimSpace(username))
+
+	m.mu.RLock()
+	u, ok := m.users[key]
+	legacy := m.legacy
+	m.mu.RUnlock()
+
+	if ok {
+		if err := m.verifyStored(u, password); err != nil {
+			return model.User{}, false, err
+		}
+		return u.User, false, nil
+	}
+
+	if legacy == nil {
+		// Spend comparable time so a missing user is not distinguishable by
+		// timing.
+		_, _ = pbkdf2.Key(sha256.New, password, []byte("dummy-salt"), pbkdf2Iters, pbkdf2KeyLen)
+		return model.User{}, false, ErrInvalidCredentials
+	}
+
+	user, valid, err := legacy.VerifyLegacy(username, password)
+	if err != nil {
+		return model.User{}, false, err
+	}
+	if !valid {
+		return model.User{}, false, ErrInvalidCredentials
+	}
+	return user, true, nil
+}
+
+// MigrateLegacyUser stores an account of the previous application locally.
+//
+// The account keeps the password the user just typed, but it is stored with a
+// salted PBKDF2 hash, so the next sign in no longer needs the sheet.
+func (m *Manager) MigrateLegacyUser(user model.User, password string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	key := strings.ToLower(strings.TrimSpace(user.Username))
+	if _, ok := m.users[key]; ok {
+		return nil
+	}
+	salt, hash, err := HashPassword(password)
+	if err != nil {
+		return err
+	}
+	u := User{
+		User:         user,
+		PasswordHash: hash,
+		Salt:         salt,
+	}
+	m.users[key] = u
+
+	if m.path == "" {
+		return nil
+	}
+	all := make([]User, 0, len(m.users))
+	for _, item := range m.users {
+		all = append(all, item)
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].Username < all[j].Username })
+	return saveUsers(m.path, all)
+}
+
+// verifyStored checks a password against a stored account.
+func (m *Manager) verifyStored(u User, password string) error {
+	salt, err := hex.DecodeString(u.Salt)
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	key, err := pbkdf2.Key(sha256.New, password, salt, pbkdf2Iters, pbkdf2KeyLen)
+	if err != nil {
+		return err
+	}
+	want, err := hex.DecodeString(u.PasswordHash)
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	if subtle.ConstantTimeCompare(key, want) != 1 {
+		return ErrInvalidCredentials
+	}
+	return nil
 }
 
 // HashPassword returns a salt and PBKDF2 hash for a plaintext password.
@@ -69,26 +243,16 @@ func HashPassword(password string) (salt, hash string, err error) {
 
 // VerifyPassword checks a plaintext password against a stored hash.
 func (m *Manager) VerifyPassword(username, password string) (model.User, error) {
+	m.mu.RLock()
 	u, ok := m.users[strings.ToLower(username)]
+	m.mu.RUnlock()
 	if !ok {
 		// Spend comparable time so a missing user is not distinguishable by timing.
 		_, _ = pbkdf2.Key(sha256.New, password, []byte("dummy-salt"), pbkdf2Iters, pbkdf2KeyLen)
 		return model.User{}, ErrInvalidCredentials
 	}
-	salt, err := hex.DecodeString(u.Salt)
-	if err != nil {
-		return model.User{}, ErrInvalidCredentials
-	}
-	key, err := pbkdf2.Key(sha256.New, password, salt, pbkdf2Iters, pbkdf2KeyLen)
-	if err != nil {
+	if err := m.verifyStored(u, password); err != nil {
 		return model.User{}, err
-	}
-	want, err := hex.DecodeString(u.PasswordHash)
-	if err != nil {
-		return model.User{}, ErrInvalidCredentials
-	}
-	if subtle.ConstantTimeCompare(key, want) != 1 {
-		return model.User{}, ErrInvalidCredentials
 	}
 	return u.User, nil
 }
@@ -162,7 +326,9 @@ func (m *Manager) UserFromRequest(r *http.Request) (model.User, bool) {
 	if time.Now().Unix() > payload.Expires {
 		return model.User{}, false
 	}
+	m.mu.RLock()
 	u, ok := m.users[strings.ToLower(payload.Username)]
+	m.mu.RUnlock()
 	if !ok {
 		return model.User{}, false
 	}

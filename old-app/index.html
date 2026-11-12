@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manajemen Pendaftaran TARBIYAH</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{--orange:#f58220;--dark:#263238;--bg:#f6f7f9;--border:#e3e6e8}
+    *{box-sizing:border-box} body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:#263238}
+    .top{background:var(--orange);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}
+    .brand{font-weight:700}.user{font-size:13px}.wrap{max-width:1250px;margin:auto;padding:18px}
+    .card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 2px 10px #00000010;margin-bottom:16px}
+    .login{max-width:420px;margin:10vh auto}.login h1{margin-top:0}
+    label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px}
+    input,select,textarea{width:100%;padding:11px;border:1px solid var(--border);border-radius:8px;font:inherit}
+    textarea{min-height:80px;resize:vertical}.btn{border:0;border-radius:8px;padding:11px 15px;cursor:pointer;font-weight:700}
+    .primary{background:var(--orange);color:#fff}.secondary{background:#eef1f3}.danger{background:#e74c3c;color:#fff}
+    .toolbar{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}.pagination{display:flex!important;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:14px;padding:12px 0 2px;min-height:48px;border-top:1px solid var(--border)}.pagination-controls{display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-height:38px}.page-btn{min-width:38px}.page-info{font-size:13px;color:#607d8b}.page-size{width:auto;min-width:95px;padding:9px 10px}.search-wrap{display:flex;gap:8px;align-items:center}.search-wrap input{flex:1}.loading{text-align:center;color:#777;padding:20px}
+    .table-wrap{overflow:auto;display:block;width:100%}.table{display:table;width:100%;border-collapse:collapse;font-size:13px;min-width:1000px}
+    th,td{border-bottom:1px solid var(--border);padding:10px;text-align:left;vertical-align:top} th{background:#fafafa}
+    .pill{display:inline-block;background:#fff1e6;color:#b65300;border-radius:99px;padding:4px 8px;font-size:11px;font-weight:700}
+    .pill.green{background:#e8f5e9;color:#2e7d32}.pill.gray{background:#eceff1;color:#546e7a}
+    .hidden{display:none!important}.radio-group{display:flex;gap:24px;align-items:center;padding:10px 0}.radio-group label{display:flex;align-items:center;gap:7px;font-weight:500;cursor:pointer}.radio-group input[type=radio]{width:auto}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.full{grid-column:1/-1}
+    .actions{white-space:nowrap}.empty{text-align:center;color:#777;padding:30px}.err{color:#b00020;font-size:13px;margin-top:10px}
+    .muted{color:#777;font-size:13px}.notice{padding:10px 12px;border-radius:8px;background:#fff8e1;color:#795548;font-size:13px;margin-bottom:12px}
+    /* Mobile-first enhancements */
+.mobile-list{display:none}.mobile-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px #00000008}.mobile-card-title{font-weight:700;font-size:16px;margin-bottom:8px}.mobile-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}.mobile-field{min-width:0}.mobile-label{display:block;font-size:11px;color:#78909c;font-weight:700;text-transform:uppercase;margin-bottom:2px}.mobile-value{font-size:13px;word-break:break-word}.mobile-actions{display:flex;gap:8px;margin-top:12px}.mobile-actions .btn{flex:1;min-height:42px}.mobile-empty{text-align:center;color:#777;padding:28px 10px}.user-mobile-card .mobile-meta{grid-template-columns:1fr}.section-title{font-size:20px}
+@media(max-width:700px){
+  body{font-size:14px}.wrap{padding:8px}.card{border-radius:10px;padding:14px;margin-bottom:10px}.login{margin:4vh 4px}.top{padding:10px 12px;position:sticky}.brand{font-size:15px}.user{font-size:11px;display:block;text-align:right;margin-bottom:5px}.top>div:last-child{display:flex;align-items:center;gap:6px}.top .btn{padding:9px 11px;min-height:40px}.grid{grid-template-columns:1fr;gap:8px}.full{grid-column:auto}label{font-size:12px;margin-top:10px}input,select,textarea{font-size:16px;min-height:44px;padding:10px}textarea{min-height:90px}.btn{min-height:44px;padding:10px 13px}.toolbar{align-items:flex-start}.toolbar h2{font-size:20px}.toolbar .btn{flex-shrink:0}.search-wrap{display:grid;grid-template-columns:1fr}.search-wrap input{width:100%}.page-size{width:100%;min-height:44px}.table-wrap{display:block}.mobile-list{display:none}.pagination{display:flex!important;flex-direction:column;align-items:stretch;gap:8px;padding-top:12px}.page-info{text-align:center}.pagination-controls{justify-content:center;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.page-btn{min-width:42px;min-height:42px}.notice{font-size:12px}.mobile-meta{grid-template-columns:1fr 1fr}.mobile-actions{flex-direction:row}.user-mobile-card .mobile-actions{flex-direction:column}.user-mobile-card .mobile-actions .btn{width:100%}
+}
+@media(max-width:380px){.mobile-meta{grid-template-columns:1fr}.brand{font-size:14px}.top .btn{padding:8px}.mobile-actions{flex-direction:column}}
+
+
+
+    /* Summary per Kecamatan */
+    .dash-kecamatan-summary{margin-top:18px}
+    .kecamatan-summary-table{width:100%;border-collapse:collapse;font-size:13px}
+    .kecamatan-summary-table th{background:#234a78;color:#fff;padding:9px 8px;text-align:center;font-weight:800}
+    .kecamatan-summary-table td{padding:8px;border-bottom:1px solid #fff;text-align:center;font-weight:600}
+    .kecamatan-summary-table td:first-child{text-align:left;font-weight:800}
+    .kecamatan-summary-table tbody tr:nth-child(odd){background:#eef6fb}
+    .kecamatan-summary-table tbody tr:nth-child(even){background:#dcecf7}
+    .kecamatan-summary-table tfoot td{background:#234a78;color:#fff;font-weight:800;border-bottom:0}
+    .pct-good{color:#176b22;font-weight:800}.pct-process{color:#c53a12;font-weight:800}
+    .upload-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .upload-info{font-size:11px;color:#78909c;width:100%;margin-top:2px}
+    @media(max-width:700px){
+      .kecamatan-summary-table{min-width:680px}
+      .upload-tools{width:100%}
+      .upload-tools .btn{flex:1}
+    }
+
+    /* Dashboard Rekapitulasi - Reference Layout */
+    .dashboard{margin-bottom:16px;background:#fff;padding:0;border-radius:0;box-shadow:none;border:0}
+    .dashboard-head{background:#55218e;color:#fff;min-height:52px;padding:10px 18px;display:flex;justify-content:center;align-items:center;position:relative;text-align:center;margin:0}
+    .dashboard-title{font-size:21px;font-weight:800;line-height:1.2;margin:0;text-transform:uppercase;letter-spacing:.1px}
+    .dashboard-subtitle{background:#eee8f5;color:#55218e;font-size:12px;font-style:italic;padding:5px 12px;margin:0;text-align:center}
+    .dashboard-head>div{width:100%}
+    .dashboard-head .dashboard-subtitle{margin:5px -18px -10px}
+    .dashboard-tools{position:absolute;right:12px;top:9px;display:flex;gap:6px;align-items:center}
+    .dashboard-filter{width:auto;max-width:190px;padding:7px 9px;font-size:12px;border:0;border-radius:6px;background:#fff;color:#55218e}
+    .dashboard-refresh{background:#fff;color:#55218e;border:0;font-size:12px;padding:7px 10px}
+    .dash-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:20px 0 14px}
+    .dash-card{border:1px solid #c9c9c9;border-radius:0;overflow:hidden;background:#fff;min-width:0}
+    .dash-card-head{padding:9px 8px;color:#fff;font-weight:800;font-size:13px;text-transform:uppercase;text-align:center;white-space:nowrap}
+    .dash-card-body{text-align:center;padding:10px 8px 7px;background:#f8fafc}
+    .dash-card-number{font-size:36px;font-weight:800;line-height:1.05}
+    .dash-card-foot{font-size:11px;color:#55218e;padding:4px 8px 7px;text-align:center;background:#fff}
+    .dash-card.total .dash-card-head,.dash-card-head.blue{background:#234a78}.dash-card.halaqah .dash-card-head,.dash-card-head.green{background:#176b22}.dash-card.program .dash-card-head,.dash-card-head.orange{background:#c53a12}.dash-card.fardiyah .dash-card-head,.dash-card-head.purple{background:#55218e}
+    .dash-card.total .dash-card-number{color:#234a78}.dash-card.halaqah .dash-card-number{color:#176b22}.dash-card.program .dash-card-number{color:#c53a12}.dash-card.fardiyah .dash-card-number{color:#55218e}
+    .dash-grid{display:grid;grid-template-columns:1.4fr .7fr;gap:18px;align-items:start}
+    .dash-panel{background:#fff;border:1px solid #d3d3d3;border-radius:0;overflow:hidden}
+    .dash-panel-head{padding:8px 12px;color:#fff;font-weight:800;font-size:15px;text-align:center}
+    .dash-panel-head.blue{background:#234a78}.dash-panel-head.green{background:#176b22}.dash-panel-head.purple{background:#55218e}
+    .dash-list{padding:0}
+    .dash-row{display:grid;grid-template-columns:minmax(0,1fr) 88px 58px;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid #fff;font-size:13px;min-height:31px}
+    .dash-row:last-child{border-bottom:0}
+    .dash-label{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .dash-value{text-align:right;font-weight:800}.dash-percent{text-align:right;color:#263238;font-weight:700;font-size:12px}
+    .dash-bar{height:6px;background:#eef1f3;border-radius:0;overflow:hidden;margin-top:4px}.dash-bar>span{display:block;height:100%;border-radius:0;background:#63a8df}
+    .dash-acceptance .dash-row:nth-child(1){background:#dcecf7}.dash-acceptance .dash-row:nth-child(2){background:#c5e0f3}.dash-acceptance .dash-row:nth-child(3){background:#a8d0ed}.dash-acceptance .dash-row:nth-child(4){background:#7eb8df}.dash-acceptance .dash-row:nth-child(5){background:#54a3db}.dash-acceptance .dash-row:nth-child(6){background:#1d8fd5;color:#fff}.dash-acceptance .dash-row:nth-child(7){background:#234a78;color:#fff;font-weight:800}
+    .dash-status .dash-row:nth-child(1){background:#7bc47f}.dash-status .dash-row:nth-child(2){background:#ffd64f}.dash-status .dash-row:nth-child(3){background:#ffb64d}.dash-status .dash-row:nth-child(4){background:#e57373}.dash-status .dash-row:nth-child(5){background:#176b22;color:#fff;font-weight:800}
+    .dash-status .dash-row{grid-template-columns:minmax(0,1fr) 88px 58px}.dash-status .dash-row .dash-bar{display:none}
+    .dash-acceptance .dash-row{grid-template-columns:minmax(0,1fr) 88px 0}.dash-acceptance .dash-percent{display:none}
+    .dash-method-summary{margin-top:18px}.dash-method-summary .dash-panel-head{background:#55218e}
+    .method-table{width:100%;border-collapse:collapse;font-size:13px}.method-table th{background:#eee8f5;color:#fff;background:#8d69ae;padding:9px 8px;text-align:center;font-weight:800}.method-table td{padding:8px;border-bottom:1px solid #fff;text-align:center}.method-table td:first-child{text-align:left;font-weight:700}.method-table tbody tr:nth-child(1){background:#ddd5e6}.method-table tbody tr:nth-child(2){background:#cfc4db}.method-table tbody tr:nth-child(3){background:#c0b1cf}.method-table tbody tr:nth-child(4){background:#e8e2ee}.method-table tfoot td{background:#55218e;color:#fff;font-weight:800;border-bottom:0}
+    .dash-note{font-size:11px;color:#78909c;padding:7px 12px;background:#fafafa;border-top:1px solid #edf0f2}.dash-loading{padding:28px;text-align:center;color:#78909c}.dash-empty{text-align:center;color:#78909c;padding:18px 12px;font-size:13px}
+    .dashboard-scope{font-size:11px;color:#78909c;text-align:center;margin-top:4px}
+    @media(max-width:850px){.dash-cards{grid-template-columns:repeat(2,1fr)}.dash-grid{grid-template-columns:1fr}.dashboard-tools{position:static;justify-content:center;flex-wrap:wrap;margin-top:8px}.dashboard-filter{max-width:100%;min-width:170px}.dashboard-head{justify-content:space-between}.dashboard-head>div{width:auto}.dashboard-head .dashboard-subtitle{margin:5px -18px -10px}.method-table{min-width:650px}.dash-method-summary .table-wrap{overflow:auto}}
+    @media(max-width:700px){.dashboard-head{padding:9px 10px;display:block}.dashboard-title{font-size:16px;padding-right:0}.dashboard-refresh{margin-top:8px}.dashboard-head .dashboard-subtitle{margin:5px -10px -9px}.dash-cards{margin-top:14px}.dash-card-head{font-size:11px}.dash-card-number{font-size:29px}.dash-grid{gap:10px}.dash-panel-head{font-size:13px}.dash-row{font-size:12px;padding:7px 8px}.dash-status .dash-row{grid-template-columns:minmax(0,1fr) 70px 45px}.dash-acceptance .dash-row{grid-template-columns:minmax(0,1fr) 70px 0}}
+    @media(max-width:380px){.dash-cards{grid-template-columns:1fr}.dash-card-head{font-size:12px}.dash-card-number{font-size:32px}}
+    /* v10.5 Mobile UX */
+    .login-screen{min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;padding:48px 18px 28px;background:linear-gradient(180deg,#f7f8fa 0%,#f2f4f6 100%)}
+    .login{width:min(430px,100%);margin:0;padding:28px 28px 20px;border-radius:18px;box-shadow:0 8px 28px #00000012}
+    .login-logo{width:56px;height:56px;border-radius:16px;background:#fff1e6;display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:12px}
+    .login-kicker{font-size:12px;font-weight:800;letter-spacing:1.4px;color:#d96d12;text-transform:uppercase;margin-bottom:4px}
+    .login h1{font-size:28px;line-height:1.15;margin:0 0 8px}.login-subtitle{margin:0 0 20px;line-height:1.45}
+    .login-form label{margin-top:14px}.login-form input{min-height:50px;border-radius:10px;background:#fff}.login-form .login-btn{width:100%;margin-top:20px;min-height:50px;font-size:15px;border-radius:10px}
+    .login-footer{text-align:center;color:#90a4ae;font-size:11px;margin-top:18px}
+    @media(max-width:700px){
+      .login-screen{min-height:100dvh;padding:24px 16px 28px;align-items:flex-start}
+      .login{width:100%;max-width:430px;margin:0;border-radius:16px;padding:24px 20px 18px}
+      .login-logo{width:52px;height:52px;border-radius:14px;font-size:26px}
+      .login h1{font-size:25px}.login-subtitle{font-size:13px;margin-bottom:16px}
+      .login-form label{font-size:13px;margin-top:12px}.login-form input{min-height:52px;font-size:16px;padding:12px}
+      .login-form .login-btn{min-height:52px;margin-top:18px}
+      .top{padding:10px 12px}.top .brand{font-size:14px}.top .user{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .wrap{padding:8px}.card{padding:14px}.toolbar{gap:10px}
+    }
+    @media(max-width:380px){
+      .login-screen{padding:16px 12px 24px}.login{padding:20px 16px 16px}.login h1{font-size:23px}
+    }
+  </style>
+</head>
+<body>
+
+<div id="loginView" class="login-screen">
+  <div class="login card">
+    <div class="login-logo">📋</div>
+    <div class="login-kicker">TARBIYAH</div>
+    <h1>Pendaftaran TARBIYAH</h1>
+    <p class="muted login-subtitle">Kelola data pendaftaran anggota dengan mudah.</p>
+    <div class="login-form">
+      <label for="username">Username</label>
+      <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Masukkan username">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Masukkan password">
+      <button id="loginBtn" class="btn primary login-btn" onclick="doLogin()">Masuk</button>
+    </div>
+    <div id="loginErr" class="err"></div>
+    <button class="btn secondary" style="width:100%;margin-top:10px" onclick="showForgotPassword()">Lupa Password?</button>
+    <button class="btn secondary" style="width:100%;margin-top:10px" onclick="showRegistration()">📝 Daftar Akses Anggota </button>
+    <div class="login-footer">Aplikasi Pendaftaran TARBIYAH</div>
+  </div>
+</div>
+
+<div id="registrationView" class="login-screen hidden">
+  <div class="login card">
+    <div class="login-logo">📝</div>
+    <div class="login-kicker">SELF-REGISTRATION</div>
+    <h1>Pendaftaran Anggota</h1>
+    <p class="muted login-subtitle">Daftarkan diri sebagai Anggota. Setelah registrasi berhasil, akun langsung aktif dan dapat digunakan.</p>
+    <div class="login-form">
+      <label for="regUsername">Username *</label>
+      <input id="regUsername" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Minimal 4 karakter">
+      <label for="regPassword">Password *</label>
+      <input id="regPassword" type="password" autocomplete="new-password" placeholder="Minimal 6 karakter">
+      <label for="regAnggota">Nama Anggota *</label>
+      <input id="regAnggota" placeholder="Nama lengkap">
+      <label for="regKecamatan">KECAMATAN *</label>
+      <select id="regKecamatan"><option value="">Memuat daftar KECAMATAN...</option></select>
+      <label>Pertanyaan keamanan 1 *</label><select id="regQ1"></select>
+      <label>Jawaban 1 *</label><input id="regA1" autocomplete="off">
+      <label>Pertanyaan keamanan 2 *</label><select id="regQ2"></select>
+      <label>Jawaban 2 *</label><input id="regA2" autocomplete="off">
+      <p class="muted">Simpan jawaban yang mudah diingat dan tidak mudah ditebak.</p>
+      <button id="regBtn" class="btn primary login-btn" onclick="submitRegistration()">Daftar & Aktifkan Akun</button>
+      <button class="btn secondary" style="margin-top:8px" onclick="showLogin()">← Kembali ke Login</button>
+    </div>
+    <div id="regErr" class="err"></div>
+    <div id="regSuccess" class="notice hidden" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<div id="forgotView" class="login-screen hidden"><div class="login card"><h1>Lupa Password</h1><label>Username</label><input id="forgotUsername"><button class="btn primary" onclick="loadRecoveryQuestions()">Lanjutkan</button><div id="forgotQuestions" class="hidden"><label id="forgotQ1Label"></label><input id="forgotA1"><label id="forgotQ2Label"></label><input id="forgotA2"><button class="btn primary" onclick="verifyRecoveryAnswers()">Verifikasi Jawaban</button></div><div id="forgotErr" class="err"></div><button class="btn secondary" onclick="showLogin()">Kembali ke Login</button></div></div>
+<div id="recoveryPasswordView" class="login-screen hidden"><div class="login card"><h1>Password Baru</h1><label>Password baru</label><input id="recoveryNewPassword" type="password"><label>Ulangi password baru</label><input id="recoveryConfirmPassword" type="password"><button class="btn primary" onclick="submitRecoveryPassword()">Simpan Password Baru</button><div id="recoveryPasswordErr" class="err"></div></div></div>
+<div id="securitySetupView" class="login-screen hidden"><div class="login card"><h1>Lengkapi Pertanyaan Keamanan</h1><p class="muted">Sebelum menggunakan aplikasi, lengkapi dua pertanyaan dan jawaban pemulihan password.</p><label>Pertanyaan 1</label><select id="setupQ1"></select><label>Jawaban 1</label><input id="setupA1"><label>Pertanyaan 2</label><select id="setupQ2"></select><label>Jawaban 2</label><input id="setupA2"><button class="btn primary" onclick="saveSecuritySetup()">Simpan dan Lanjutkan</button><div id="securitySetupErr" class="err"></div></div></div>
+<div id="appView" class="hidden">
+  <div class="top">
+    <div class="brand">📋 Manajemen Pendaftaran</div>
+    <div><span id="who" class="user"></span> <button class="btn secondary" onclick="changeMyPassword()">🔑 Password</button> <button class="btn secondary" onclick="doLogout()">Keluar</button></div>
+  </div>
+
+  <div class="wrap">
+
+
+    <!-- DASHBOARD -->
+    <div id="dashboardCard" class="card dashboard">
+      <div class="dashboard-head">
+        <div>
+          <h2 class="dashboard-title">📊 DASHBOARD REKAPITULASI PENDAFTARAN ANGGOTA PELAPOR</h2>
+          <div id="dashboardScope" class="dashboard-subtitle">Data terupdate otomatis secara real-time</div>
+        </div>
+        <div class="dashboard-tools">
+          <select id="dashboardFilter" class="dashboard-filter hidden" aria-label="Filter dashboard" onchange="loadDashboard()" title="Filter dashboard">
+            <option value="ALL">Semua Kecamatan</option>
+            <option value="KECAMATAN">Data Kecamatan Saya</option>
+            <option value="ANGGOTA">Data Anggota Saya</option>
+          </select>
+          <button class="btn secondary dashboard-refresh" onclick="loadDashboard()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="dash-cards">
+        <div class="dash-card total">
+          <div class="dash-card-head">TOTAL TARGET</div>
+          <div class="dash-card-body"><div id="dashTotal" class="dash-card-number">0</div></div>
+          <div class="dash-card-foot">orang</div>
+        </div>
+        <div class="dash-card halaqah">
+          <div class="dash-card-head">HALAQAH</div>
+          <div class="dash-card-body"><div id="dashHalaqah" class="dash-card-number">0</div></div>
+          <div class="dash-card-foot">orang</div>
+        </div>
+        <div class="dash-card program">
+          <div class="dash-card-head">PROG. ANTARA</div>
+          <div class="dash-card-body"><div id="dashProgramAntara" class="dash-card-number">0</div></div>
+          <div class="dash-card-foot">orang</div>
+        </div>
+        <div class="dash-card fardiyah">
+          <div class="dash-card-head">DAKWAH FARDLIYAH</div>
+          <div class="dash-card-body"><div id="dashDakwahFardiyah" class="dash-card-number">0</div></div>
+          <div class="dash-card-foot">orang</div>
+        </div>
+      </div>
+      <div id="dashboardScopeText" class="dashboard-scope"></div>
+
+      <div class="dash-grid">
+        <div class="dash-panel dash-acceptance">
+          <div class="dash-panel-head blue">📌 Berdasarkan Tingkat Penerimaan</div>
+          <div id="dashAcceptance" class="dash-list"></div>
+        </div>
+        <div class="dash-panel dash-status">
+          <div class="dash-panel-head green">☑ Berdasarkan Status</div>
+          <div id="dashStatus" class="dash-list"></div>
+        </div>
+      </div>
+
+      <div class="dash-panel dash-method-summary">
+        <div class="dash-panel-head purple">▣ Ringkasan Metode Pendaftaran</div>
+        <div class="table-wrap">
+          <table class="method-table">
+            <thead>
+              <tr>
+                <th>Metode Pendaftaran</th>
+                <th>Jumlah Target</th>
+                <th>Berhasil</th>
+                <th>Proses</th>
+                <th>Gagal/Pending</th>
+                <th>% dari Total</th>
+              </tr>
+            </thead>
+            <tbody id="dashMethodSummary"></tbody>
+            <tfoot id="dashMethodSummaryTotal"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="dash-panel dash-kecamatan-summary">
+        <div class="dash-panel-head blue">▦ Summary per Kecamatan</div>
+        <div class="table-wrap">
+          <table class="kecamatan-summary-table">
+            <thead>
+              <tr>
+                <th>Kecamatan</th>
+                <th>Target</th>
+                <th>Berhasil</th>
+                <th>Proses</th>
+                <th>% Berhasil</th>
+                <th>% Proses</th>
+              </tr>
+            </thead>
+            <tbody id="dashKecamatanSummary"></tbody>
+            <tfoot id="dashKecamatanSummaryTotal"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-panel-head white" style="margin-top:14px">
+      <table class="method-table" style="min-width:520px">
+        <!--<table style="min-width:520px">-->
+          <thead>
+              <tr><th colspan="3">🏆 Top 10 Anggota dengan Pendaftaran Terbanyak 🏆</th></tr>
+              <tr>
+                <th>Peringkat</th>
+                <th>Nama Anggota</th>
+                <th>Jumlah Pendaftaran</th>
+              </tr>
+          </thead><tbody id="dashTop10"></tbody>
+      </table>
+    </div>
+
+
+    <!-- FORM PENDAFTARAN -->
+    <div id="formCard" class="card hidden">
+      <div class="toolbar"><h2 id="formTitle">Input Pendaftaran</h2></div>
+      <input type="hidden" id="fID">
+      <div class="grid">
+        <div><label>Nama Target *</label><input id="fTarget"></div>
+        <div><label>No WhatsApp *</label><input id="fWA" inputmode="tel"></div>
+        <div class="full"><label>Alamat</label><textarea id="fAlamat"></textarea></div>
+        <div><label>RT</label><input id="fRT"></div>
+        <div><label>RW</label><input id="fRW"></div>
+        <div><label>Kecamatan *</label><select id="fKecamatan" onchange="loadKelurahan()"><option value="">Pilih Kecamatan</option></select></div>
+        <div><label>Kelurahan *</label><select id="fKelurahan"><option value="">Pilih Kelurahan</option></select></div>
+        <div class="full"><label>UPLS / UPLM <span class="muted">(opsional, pilih salah satu)</span></label>
+          <div class="radio-group">
+            <label><input type="radio" name="upl_type" value="UPLS"> UPLS</label>
+            <label><input type="radio" name="upl_type" value="UPLM"> UPLM</label>
+          </div>
+        </div>
+        <div><label>Aktifitas *</label><select id="fAktifitas"><option value="">Pilih Aktifitas</option></select></div>
+        <div><label>Tingkat Penerimaan *</label><select id="fPenerimaan"><option value="">Pilih</option><option>Sangat Terbuka</option><option>Terbuka</option><option>Netral</option><option>Kurang Terbuka</option><option>Tertutup</option></select></div>
+        <div><label>Metode *</label><select id="fMetode"><option value="">Pilih</option><option>Halaqah</option><option>Program Antara</option><option>Dakwah Fardliyah</option></select></div>
+        <div><label>Status *</label><select id="fStatus"><option value="">Pilih</option><option>Berhasil</option><option>Proses</option><option>Pending</option><option>Gagal</option></select></div>
+        <div class="full"><label>Keterangan</label><textarea id="fKet"></textarea></div>
+      </div>
+      <button class="btn primary" style="margin-top:14px" onclick="saveForm()">Simpan</button><div id="formErr" class="err">
+      <button class="btn secondary" onclick="cancelForm()">Batal</button>
+      </div>
+    </div>
+
+    <!-- DATA PENDAFTARAN -->
+    <div class="card">
+      <div class="toolbar">
+        <div>
+          <h2 style="margin:0">Data Pendaftaran</h2>
+          <div id="scope" class="muted"></div>
+        </div>
+        <div class="upload-tools">
+          <button id="templateBtn" class="btn secondary hidden" onclick="downloadExcelTemplate()">⬇ Template Excel</button>
+          <button id="uploadBtn" class="btn primary hidden" onclick="triggerExcelUpload()">⬆ Upload Excel</button>
+          <input id="excelFileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleExcelUpload(event)">
+          <button id="exportBtn" class="btn secondary" onclick="exportExcel()">⬇ Export Excel</button>
+          <button id="addBtn" class="btn primary hidden" onclick="newForm()">+ Input Pendaftaran</button>
+          <div id="uploadInfo" class="upload-info hidden">Upload hanya untuk ANGGOTA. Kolom NAMA ANGGOTA dan KECAMATAN pemilik diisi otomatis dari akun Anda.</div>
+        </div>
+      </div>
+
+      <div id="readOnlyNotice" class="notice hidden" style="margin-top:12px"></div>
+
+      <div style="margin:14px 0" class="search-wrap">
+        <input id="search" placeholder="🔎 Cari nama target, anggota, KECAMATAN, status..." oninput="onSearchInput()">
+        <select id="pageSize" class="page-size" onchange="changePageSize()" title="Jumlah data per halaman">
+          <option value="10">10 / halaman</option>
+          <option value="25">25 / halaman</option>
+          <option value="50">50 / halaman</option>
+          <option value="100">100 / halaman</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr>
+            <th>No</th><th>Nama Anggota</th><th>Nama Target</th><th>No WhatsApp</th><th>KECAMATAN</th>
+            <th>Alamat</th><th>RT</th><th>RW</th><th>Kecamatan</th><th>Kelurahan</th><th>UPLS</th><th>UPLM</th>
+            <th>Aktifitas</th><th>Penerimaan</th><th>Metode</th><th>Status</th><th>Keterangan</th><th id="actHead">Aksi</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="mobileList" class="mobile-list"></div>
+      <div id="pagination" class="pagination">
+        <div id="pageInfo" class="page-info"></div>
+        <div id="paginationControls" class="pagination-controls"></div>
+      </div>
+    </div>
+
+    <!-- USER MANAGEMENT: SYSTEM ADMIN SAJA -->
+    <div id="userCard" class="card hidden">
+      <div class="toolbar">
+        <div>
+          <h2 style="margin:0">👤 Kelola User</h2>
+          <div class="muted">Khusus System Admin</div>
+        </div>
+        <button class="btn primary" onclick="showCreateUser()">+ Tambah User</button>
+      </div>
+
+      <div id="userForm" class="hidden" style="margin-top:14px">
+        <div class="grid">
+          <div><label>Username *</label><input id="uUsername"></div>
+          <div><label>Password Awal *</label><input id="uPassword" type="password"></div>
+          <div><label>Role *</label>
+            <select id="uRole" onchange="updateUserFields()">
+              <option value="ANGGOTA">ANGGOTA</option>
+              <option value="ADMIN KECAMATAN">ADMIN KECAMATAN</option>
+              <option value="ADMIN PTD">ADMIN PTD</option>
+              <option value="SYSTEM ADMIN">SYSTEM ADMIN</option>
+            </select>
+          </div>
+          <div id="uAnggotaWrap"><label>Nama Anggota</label><input id="uAnggota"></div>
+          <div id="uKecamatanWrap"><label>Nama KECAMATAN</label><input id="uKecamatan"></div>
+        </div>
+        <button class="btn primary" style="margin-top:12px" onclick="createUserFromUI()">Simpan User</button>
+        <button class="btn secondary" style="margin-top:12px" onclick="hideCreateUser()">Batal</button>
+        <div id="userFormErr" class="err"></div>
+      </div>
+
+      <div style="margin:14px 0">
+        <input id="userSearch" placeholder="🔎 Cari username, anggota, KECAMATAN, role..." oninput="renderUsers()">
+      </div>
+
+      <div class="table-wrap">
+        <table class="table" style="min-width:800px">
+          <thead><tr>
+            <th>No</th><th>Username</th><th>Role</th><th>Nama Anggota</th><th>KECAMATAN</th><th>Status</th><th>Aksi</th>
+          </tr></thead>
+          <tbody id="userTbody"></tbody>
+        </table>
+      </div>
+      <div id="userMobileList" class="mobile-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let token='', me=null, rows=[], users=[], registrations=[];
+let currentPage=1, pageSize=10, totalRows=0, totalPages=1;
+let pendingSecurityToken='', recoveryToken='', recoveryUsername='';
+const SECURITY_QUESTIONS=['Apa nama panggilan masa kecil Anda?','Di kota mana Anda dilahirkan?','Apa nama sekolah dasar Anda?','Apa nama hewan peliharaan pertama Anda?','Apa nama jalan tempat Anda dibesarkan?','Siapa nama teman masa kecil Anda?'];
+function fillQuestionSelect(id){const el=document.getElementById(id);if(el)el.innerHTML='<option value="">Pilih pertanyaan</option>'+SECURITY_QUESTIONS.map(q=>`<option value="${escapeHtml(q)}">${escapeHtml(q)}</option>`).join('');}
+function hideAuthViews(){['loginView','registrationView','forgotView','recoveryPasswordView','securitySetupView'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
+let searchTimer=null, loadingRows=false;
+
+function call(fn,...args){
+  return new Promise((resolve,reject)=>{
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(e=>reject(new Error(e.message||e)))[fn](...args);
+  });
+}
+
+
+async function showRegistration(){
+  hideAuthViews(); fillQuestionSelect('regQ1'); fillQuestionSelect('regQ2');
+  document.getElementById('registrationView').classList.remove('hidden');
+  document.getElementById('regErr').textContent='';
+  document.getElementById('regSuccess').classList.add('hidden');
+
+  const select=document.getElementById('regKecamatan');
+  select.innerHTML='<option value="">Memuat daftar KECAMATAN...</option>';
+  try{
+    const kecamatans=await call('getRegistrationKecamatans');
+    if(!kecamatans.length){
+      select.innerHTML='<option value="">Belum ada KECAMATAN yang tersedia</option>';
+      return;
+    }
+    select.innerHTML='<option value="">Pilih KECAMATAN...</option>'+kecamatans.map(d=>`<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+  }catch(e){
+    select.innerHTML='<option value="">Gagal memuat KECAMATAN</option>';
+    document.getElementById('regErr').textContent=e.message;
+  }
+}
+
+function showLogin(message=''){hideAuthViews();document.getElementById('loginView').classList.remove('hidden');document.getElementById('regErr').textContent='';document.getElementById('loginErr').textContent=message;}
+
+async function submitRegistration(){
+  const err=document.getElementById('regErr');
+  const success=document.getElementById('regSuccess');
+  const btn=document.getElementById('regBtn');
+  err.textContent='';
+  success.classList.add('hidden');
+
+  const username=document.getElementById('regUsername').value.trim();
+  const password=document.getElementById('regPassword').value;
+  const anggota=document.getElementById('regAnggota').value.trim();
+  const kecamatan=document.getElementById('regKecamatan').value;
+  const q1=document.getElementById('regQ1').value,a1=document.getElementById('regA1').value.trim(),q2=document.getElementById('regQ2').value,a2=document.getElementById('regA2').value.trim();
+
+  btn.disabled=true; btn.textContent='Mengirim...';
+  try{
+    const r=await call('selfRegister',username,password,anggota,kecamatan,q1,a1,q2,a2);
+    success.textContent='✓ '+r.message;
+    success.classList.remove('hidden');
+    document.getElementById('regUsername').value='';
+    document.getElementById('regPassword').value='';
+    document.getElementById('regAnggota').value='';
+    document.getElementById('regKecamatan').value='';
+    ['regQ1','regQ2','regA1','regA2'].forEach(id=>document.getElementById(id).value='');
+  }catch(e){
+    err.textContent=e.message;
+  }finally{
+    btn.disabled=false; btn.textContent='Daftar & Aktifkan Akun';
+  }
+}
+
+async function showForgotPassword(){hideAuthViews();document.getElementById('forgotView').classList.remove('hidden');document.getElementById('forgotErr').textContent='';document.getElementById('forgotQuestions').classList.add('hidden');document.getElementById('forgotUsername').value=document.getElementById('username').value.trim();}
+async function loadRecoveryQuestions(){recoveryUsername=document.getElementById('forgotUsername').value.trim();try{const r=await call('getSecurityQuestions',recoveryUsername);if(r.requiresSetup){showLogin('Antum tidak punya akses ke Aplikasi. Hubungi System Admin untuk konfirmasi');return;}document.getElementById('forgotQ1Label').textContent=r.questions[0];document.getElementById('forgotQ2Label').textContent=r.questions[1];document.getElementById('forgotQuestions').classList.remove('hidden');}catch(e){showLogin('Antum tidak punya akses ke Aplikasi. Hubungi System Admin untuk konfirmasi');}}
+async function verifyRecoveryAnswers(){try{const r=await call('verifySecurityAnswers',recoveryUsername,document.getElementById('forgotA1').value,document.getElementById('forgotA2').value);recoveryToken=r.recoveryToken;hideAuthViews();document.getElementById('recoveryPasswordView').classList.remove('hidden');}catch(e){showLogin('Antum tidak punya akses ke Aplikasi. Hubungi System Admin untuk konfirmasi');}}
+async function submitRecoveryPassword(){const a=document.getElementById('recoveryNewPassword').value,b=document.getElementById('recoveryConfirmPassword').value,err=document.getElementById('recoveryPasswordErr');err.textContent='';if(a.length<6){err.textContent='Password minimal 6 karakter.';return;}if(a!==b){err.textContent='Konfirmasi password tidak sama.';return;}try{await call('changePasswordWithRecovery',recoveryToken,a);recoveryToken='';showLogin('Password berhasil diubah. Silakan login dengan password baru.');}catch(e){err.textContent=e.message;}}
+async function saveSecuritySetup(){const q1=document.getElementById('setupQ1').value,a1=document.getElementById('setupA1').value.trim(),q2=document.getElementById('setupQ2').value,a2=document.getElementById('setupA2').value.trim(),err=document.getElementById('securitySetupErr');err.textContent='';if(!q1||!q2||!a1||!a2){err.textContent='Dua pertanyaan dan jawaban wajib diisi.';return;}if(q1===q2){err.textContent='Pilih dua pertanyaan yang berbeda.';return;}try{await call('saveMySecurityQuestions',pendingSecurityToken,q1,a1,q2,a2);hideAuthViews();showApp();await Promise.all([loadDashboard(),load()]);if(me.role==='SYSTEM ADMIN')await loadUsers();pendingSecurityToken='';}catch(e){err.textContent=e.message;}}
+
+async function doLogin(){
+  const err=document.getElementById('loginErr'); err.textContent='';
+  const btn=document.getElementById('loginBtn');
+  if(btn){btn.disabled=true;btn.textContent='Memproses...';}
+  try{
+    const r=await call(
+      'login',
+      document.getElementById('username').value,
+      document.getElementById('password').value
+    );
+    token=r.token;
+    me=r.user;
+    sessionStorage.setItem('token',token);
+    if(r.requiresSecuritySetup){pendingSecurityToken=token;hideAuthViews();fillQuestionSelect('setupQ1');fillQuestionSelect('setupQ2');document.getElementById('securitySetupView').classList.remove('hidden');return;}
+    showApp();
+    await Promise.all([loadDashboard(), load()]);
+    if(me.role==='SYSTEM ADMIN') await loadUsers();
+  }catch(e){err.textContent=e.message}
+  finally{if(btn){btn.disabled=false;btn.textContent='Masuk';}}
+}
+
+function showApp(){
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+
+  document.getElementById('who').textContent=`${me.anggota} • ${me.role}`;
+
+  const scope=document.getElementById('scope');
+  const notice=document.getElementById('readOnlyNotice');
+  const addBtn=document.getElementById('addBtn');
+  const templateBtn=document.getElementById('templateBtn');
+  const uploadBtn=document.getElementById('uploadBtn');
+  const uploadInfo=document.getElementById('uploadInfo');
+  const actHead=document.getElementById('actHead');
+  const dashboardFilter=document.getElementById('dashboardFilter');
+
+  addBtn.classList.add('hidden');
+  dashboardFilter?.classList.toggle('hidden', me.role!=='ANGGOTA');
+  if (dashboardFilter && me.role==='ANGGOTA') dashboardFilter.value='ALL';
+  templateBtn?.classList.add('hidden');
+  uploadBtn?.classList.add('hidden');
+  uploadInfo?.classList.add('hidden');
+  document.getElementById('userCard').classList.add('hidden');
+  actHead.textContent='Aksi';
+
+  if(me.role==='ANGGOTA'){
+    scope.textContent=`Data milik Anda • Anggota: ${me.anggota} • KECAMATAN: ${me.kecamatan}`;
+    addBtn.classList.remove('hidden');
+    templateBtn?.classList.remove('hidden');
+    uploadBtn?.classList.remove('hidden');
+    uploadInfo?.classList.remove('hidden');
+    notice.classList.add('hidden');
+  }else if(me.role==='ADMIN KECAMATAN'){
+    scope.textContent=`Data KECAMATAN: ${me.kecamatan}`;
+    notice.textContent='Admin KECAMATAN dapat melihat dan mengubah data pada KECAMATAN ini, tetapi tidak dapat menghapus data anggota.';
+    notice.classList.remove('hidden');
+  }else if(me.role==='ADMIN PTD'){
+    scope.textContent='Seluruh data pendaftaran • Tingkat PTD';
+    notice.textContent='Mode lihat saja: Anda dapat melihat seluruh data pendaftaran.';
+    notice.classList.remove('hidden');
+  }else if(me.role==='SYSTEM ADMIN'){
+
+    scope.textContent='Seluruh data pendaftaran • System Admin';
+    notice.textContent='Mode aplikasi: Anda dapat melihat seluruh data pendaftaran dan mengelola user.';
+    notice.classList.remove('hidden');
+    document.getElementById('userCard').classList.remove('hidden');
+  }
+}
+
+
+async function loadDashboard(){
+  try{
+    const filter = me && me.role==='ANGGOTA'
+      ? (document.getElementById('dashboardFilter')?.value || 'ALL')
+      : '';
+    renderDashboard(await call('getDashboard',token,filter)||{});
+  }catch(e){
+    document.getElementById('dashboardScope').textContent='Gagal memuat dashboard: '+e.message;
+    document.getElementById('dashboardScopeText').textContent='';
+  }
+}
+
+function renderDashboard(d){
+  const total=Number(d.total||0);
+  const methods=Array.isArray(d.methods)?d.methods:[];
+  const acceptance=Array.isArray(d.acceptance)?d.acceptance:[];
+  const status=Array.isArray(d.status)?d.status:[];
+  const methodSummary=Array.isArray(d.methodSummary)?d.methodSummary:[];
+  const kecamatanSummary=Array.isArray(d.kecamatanSummary)?d.kecamatanSummary:[];
+
+  document.getElementById('dashboardScope').textContent='Data terupdate otomatis secara real-time';
+  document.getElementById('dashboardScopeText').textContent=`${d.scope||'Rekapitulasi'} • Total ${formatNumber(total)} target`;
+
+  const findMethod=(name)=>methods.find(x=>String(x.name||'').toLowerCase()===name.toLowerCase());
+  const halaqah=findMethod('Halaqah');
+  const program=findMethod('Program Antara');
+  const fardiyah=findMethod('Dakwah Fardliyah');
+  document.getElementById('dashTotal').textContent=formatNumber(total);
+  document.getElementById('dashHalaqah').textContent=formatNumber(halaqah?.total||0);
+  document.getElementById('dashProgramAntara').textContent=formatNumber(program?.total||0);
+  document.getElementById('dashDakwahFardiyah').textContent=formatNumber(fardiyah?.total||0);
+
+  // Top 10 Dashboard
+  const top=Array.isArray(d.top10)?d.top10:[];
+  document.getElementById('dashTop10').innerHTML=top.length?top.map((x,i)=>`<tr style="color: black;"><td style="text-align: center;">${formatNumber(i+1)}</td><td>${escapeHtml(x.nama||'-')}</td><td>${formatNumber(x.total||0)}</td></tr>`).join(''):`<tr><td colspan="3" class="empty">Belum ada data.</td></tr>`;
+
+  renderAcceptancePanel(acceptance,total);
+  renderStatusPanel(status,total);
+  renderMethodSummary(methodSummary,total);
+  renderKecamatanSummary(kecamatanSummary);
+
+}
+
+function renderAcceptancePanel(items,total){
+  const el=document.getElementById('dashAcceptance');
+  if(!el)return;
+  const safe=Array.isArray(items)?items:[];
+  const rows=safe.map(x=>`<div class="dash-row"><div class="dash-label">${escapeHtml(x.name||'-')}</div><div class="dash-value">${formatNumber(x.total||0)}</div><div class="dash-percent"></div></div>`);
+  rows.push(`<div class="dash-row"><div class="dash-label">TOTAL</div><div class="dash-value">${formatNumber(total)}</div><div class="dash-percent"></div></div>`);
+  el.innerHTML=rows.join('') || `<div class="dash-empty">Belum ada data.</div>`;
+}
+
+function renderStatusPanel(items,total){
+  const el=document.getElementById('dashStatus');
+  if(!el)return;
+  const safe=Array.isArray(items)?items:[];
+  const rows=safe.map(x=>`<div class="dash-row"><div class="dash-label">${escapeHtml(x.name||'-')}</div><div class="dash-value">${formatNumber(x.total||0)}</div><div class="dash-percent">${formatPercent(x.percent||0)}</div></div>`);
+  const statusTotal=safe.reduce((sum,x)=>sum+Number(x.total||0),0);
+  rows.push(`<div class="dash-row"><div class="dash-label">Total</div><div class="dash-value">${formatNumber(statusTotal||total)}</div><div class="dash-percent"></div></div>`);
+  el.innerHTML=rows.join('') || `<div class="dash-empty">Belum ada data.</div>`;
+}
+
+function renderMethodSummary(items,total){
+  const body=document.getElementById('dashMethodSummary');
+  const foot=document.getElementById('dashMethodSummaryTotal');
+  if(!body||!foot)return;
+  const safe=Array.isArray(items)?items:[];
+  body.innerHTML=safe.length?safe.map(x=>`<tr>
+    <td>${escapeHtml(x.name||'-')}</td>
+    <td>${formatNumber(x.total||0)}</td>
+    <td>${formatNumber(x.berhasil||0)}</td>
+    <td>${formatNumber(x.proses||0)}</td>
+    <td>${formatNumber(x.gagalPending||0)}</td>
+    <td>${formatPercent(x.percent||0)}</td>
+  </tr>`).join(''):`<tr><td colspan="6" class="empty">Belum ada data.</td></tr>`;
+  const totalBerhasil=safe.reduce((s,x)=>s+Number(x.berhasil||0),0);
+  const totalProses=safe.reduce((s,x)=>s+Number(x.proses||0),0);
+  const totalGagalPending=safe.reduce((s,x)=>s+Number(x.gagalPending||0),0);
+  foot.innerHTML=`<tr><td>TOTAL</td><td>${formatNumber(total)}</td><td>${formatNumber(totalBerhasil)}</td><td>${formatNumber(totalProses)}</td><td>${formatNumber(totalGagalPending)}</td><td>100%</td></tr>`;
+}
+
+
+function renderKecamatanSummary(items){
+  const body=document.getElementById('dashKecamatanSummary');
+  const foot=document.getElementById('dashKecamatanSummaryTotal');
+  if(!body||!foot)return;
+  const safe=Array.isArray(items)?items:[];
+  body.innerHTML=safe.length?safe.map(x=>`<tr>
+    <td>${escapeHtml(x.kecamatan||'-')}</td>
+    <td>${formatNumber(x.target||0)}</td>
+    <td>${formatNumber(x.berhasil||0)}</td>
+    <td>${formatNumber(x.proses||0)}</td>
+    <td class="pct-good">${formatPercent(x.persenBerhasil||0)}</td>
+    <td class="pct-process">${formatPercent(x.persenProses||0)}</td>
+  </tr>`).join(''):`<tr><td colspan="6" class="empty">Belum ada data.</td></tr>`;
+
+  const target=safe.reduce((s,x)=>s+Number(x.target||0),0);
+  const berhasil=safe.reduce((s,x)=>s+Number(x.berhasil||0),0);
+  const proses=safe.reduce((s,x)=>s+Number(x.proses||0),0);
+  foot.innerHTML=`<tr>
+    <td>TOTAL</td>
+    <td>${formatNumber(target)}</td>
+    <td>${formatNumber(berhasil)}</td>
+    <td>${formatNumber(proses)}</td>
+    <td>${formatPercent(target?Math.round(berhasil/target*1000)/10:0)}</td>
+    <td>${formatPercent(target?Math.round(proses/target*1000)/10:0)}</td>
+  </tr>`;
+}
+
+function formatNumber(n){return Number(n||0).toLocaleString('id-ID');}
+function formatPercent(n){
+  const x=Number(n||0);
+  return Number.isInteger(x)?`${x}%`:`${x.toFixed(1)}%`;
+}
+function dashCardColor(cls){
+  return {blue:'#234a78',green:'#176b22',orange:'#c53a12',purple:'#55218e'}[cls]||'#234a78';
+}
+function escapeHtml(value){
+  return String(value==null?'':value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+
+async function load(page = currentPage) {
+  try {
+    loadingRows = true;
+    currentPage = Math.max(1, page || 1);
+    pageSize = parseInt(document.getElementById('pageSize')?.value || pageSize, 10) || 10;
+    const keyword = document.getElementById('search')?.value.trim() || '';
+
+    const tbody = document.getElementById('tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="18" class="loading">Memuat data...</td></tr>';
+
+    const result = await call('getRecruitmentsPaged', token, currentPage, pageSize, keyword);
+    rows = Array.isArray(result?.rows) ? result.rows : [];
+    totalRows = Number(result?.total || 0);
+    currentPage = Number(result?.page || 1);
+    totalPages = Math.max(1, Number(result?.totalPages || 1));
+
+    updateScopeCount();
+    render();
+  } catch (e) {
+    document.getElementById('scope').textContent='ERROR: '+e.message;
+    alert('ERROR: '+e.message);
+  } finally {
+    loadingRows = false;
+  }
+}
+
+function updateScopeCount(){
+  const base =
+    me.role==='ANGGOTA'
+      ? `Data milik Anda • Anggota: ${me.anggota} • KECAMATAN: ${me.kecamatan}`
+      : me.role==='ADMIN KECAMATAN'
+        ? `Data KECAMATAN: ${me.kecamatan}`
+        : me.role==='ADMIN PTD'
+          ? 'Seluruh data pendaftaran • Tingkat Kota'
+          : 'Seluruh data pendaftaran • System Admin';
+
+  const from = totalRows === 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+  const to = Math.min(currentPage * pageSize, totalRows);
+  const range = totalRows ? ` • Menampilkan ${from}-${to} dari ${totalRows} data` : ' • 0 data';
+  document.getElementById('scope').textContent=base+range;
+}
+
+function onSearchInput(){
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(()=>load(1), 300);
+}
+
+function changePageSize(){
+  pageSize=parseInt(document.getElementById('pageSize').value,10)||10;
+  load(1);
+}
+
+function goToPage(page){
+  page=Math.max(1,Math.min(totalPages,page));
+  if(page===currentPage && !loadingRows)return;
+  load(page);
+}
+
+function renderPagination(){
+  const bar=document.getElementById('pagination');
+  const info=document.getElementById('pageInfo');
+  const controls=document.getElementById('paginationControls');
+  if(!bar||!info||!controls)return;
+  bar.style.display='flex';
+
+  const from=totalRows===0?0:((currentPage-1)*pageSize)+1;
+  const to=Math.min(currentPage*pageSize,totalRows);
+  info.textContent=totalRows ? `Halaman ${currentPage} dari ${totalPages} • ${from}-${to} dari ${totalRows}` : 'Tidak ada data';
+  controls.innerHTML='';
+
+  const makeBtn=(label,page,disabled=false)=>{
+    const b=document.createElement('button');
+    b.className='btn secondary page-btn';
+    b.textContent=label;
+    b.disabled=disabled;
+    b.onclick=()=>goToPage(page);
+    return b;
+  };
+
+  controls.appendChild(makeBtn('‹',currentPage-1,currentPage<=1));
+
+  // Tampilkan nomor halaman secara ringkas agar tetap nyaman bila halaman sangat banyak.
+  const pages=[];
+  if(totalPages<=7){
+    for(let i=1;i<=totalPages;i++)pages.push(i);
+  }else{
+    pages.push(1);
+    if(currentPage>4)pages.push('…');
+    const start=Math.max(2,currentPage-1);
+    const end=Math.min(totalPages-1,currentPage+1);
+    for(let i=start;i<=end;i++)pages.push(i);
+    if(currentPage<totalPages-3)pages.push('…');
+    pages.push(totalPages);
+  }
+
+  pages.forEach(p=>{
+    if(p==='…'){
+      const span=document.createElement('span');
+      span.className='page-info'; span.textContent='…';
+      controls.appendChild(span);
+      return;
+    }
+    const b=makeBtn(String(p),p,p===currentPage);
+    if(p===currentPage)b.style.fontWeight='700';
+    controls.appendChild(b);
+  });
+
+  controls.appendChild(makeBtn('›',currentPage+1,currentPage>=totalPages));
+}
+
+function render(){
+  const tbody=document.getElementById('tbody');
+  if(!tbody)return;
+  tbody.innerHTML='';
+
+  if(!Array.isArray(rows)||rows.length===0){
+    const keyword=document.getElementById('search')?.value.trim();
+    tbody.innerHTML=`<tr><td colspan="18" class="empty">${keyword?'Data tidak ditemukan.':'Tidak ada data pendaftaran.'}</td></tr>`;
+    renderMobileRows();
+    renderPagination();
+    return;
+  }
+
+  rows.forEach((r,index)=>{
+    const tr=document.createElement('tr');
+    const td=value=>{
+      const cell=document.createElement('td');
+      cell.textContent=value==null?'':String(value);
+      return cell;
+    };
+
+    tr.appendChild(td(((currentPage-1)*pageSize)+index+1));
+    tr.appendChild(td(r['NAMA ANGGOTA']));
+    tr.appendChild(td(r['NAMA TARGET']));
+    tr.appendChild(td(r['NO WHATSAPP']));
+    tr.appendChild(td(r['NAMA KECAMATAN']));
+    tr.appendChild(td(r['ALAMAT']));
+    tr.appendChild(td(r['RT']));
+    tr.appendChild(td(r['RW']));
+    tr.appendChild(td(r['KECAMATAN']));
+    tr.appendChild(td(r['KELURAHAN']));
+    tr.appendChild(td(r['UPLS']));
+    tr.appendChild(td(r['UPLM']));
+    tr.appendChild(td(r['AKTIFITAS']));
+    tr.appendChild(td(r['TINGKAT PENERIMAAN']));
+    tr.appendChild(td(r['METODE']));
+    tr.appendChild(td(r['STATUS']));
+    tr.appendChild(td(r['KETERANGAN']));
+
+    const action=document.createElement('td');
+    action.className='actions';
+
+    if(me && (me.role==='ANGGOTA' || me.role==='ADMIN KECAMATAN')){
+      const editBtn=document.createElement('button');
+      editBtn.className='btn secondary';
+      editBtn.textContent='Edit';
+      editBtn.style.marginRight='5px';
+      editBtn.onclick=()=>editRow(r);
+
+      action.appendChild(editBtn);
+      if(me.role==='ANGGOTA'){
+        const deleteBtn=document.createElement('button');
+        deleteBtn.className='btn danger'; deleteBtn.textContent='Hapus';
+        deleteBtn.onclick=()=>delRow(r.ID);
+        action.appendChild(deleteBtn);
+      }
+    }else{
+      action.textContent='-';
+    }
+
+    tr.appendChild(action);
+    tbody.appendChild(tr);
+  });
+
+  renderMobileRows();
+  renderPagination();
+}
+
+function renderMobileRows(){
+  const list=document.getElementById('mobileList');
+  if(!list)return;
+  list.innerHTML='';
+  if(!Array.isArray(rows)||rows.length===0){
+    const empty=document.createElement('div');
+    empty.className='mobile-empty';
+    const keyword=document.getElementById('search')?.value.trim();
+    empty.textContent=keyword?'Data tidak ditemukan.':'Tidak ada data pendaftaran.';
+    list.appendChild(empty);
+    return;
+  }
+  rows.forEach((r,index)=>{
+    const card=document.createElement('div');
+    card.className='mobile-card';
+    const title=document.createElement('div');
+    title.className='mobile-card-title';
+    title.textContent=`${((currentPage-1)*pageSize)+index+1}. ${r['NAMA TARGET']||'-'}`;
+    card.appendChild(title);
+
+    const meta=document.createElement('div');
+    meta.className='mobile-meta';
+    const fields=[
+      ['Anggota',r['NAMA ANGGOTA']],['KECAMATAN',r['NAMA KECAMATAN']],
+      ['WhatsApp',r['NO WHATSAPP']],['Status',r['STATUS']],
+      ['Penerimaan',r['TINGKAT PENERIMAAN']],['Metode',r['METODE']],
+      ['Aktifitas',r['AKTIFITAS']],['Alamat',r['ALAMAT']],
+      ['Keterangan',r['KETERANGAN']]
+    ];
+    fields.forEach(([label,value])=>{
+      const f=document.createElement('div'); f.className='mobile-field';
+      const l=document.createElement('span'); l.className='mobile-label'; l.textContent=label;
+      const v=document.createElement('div'); v.className='mobile-value'; v.textContent=value==null||value===''?'-':String(value);
+      f.append(l,v); meta.appendChild(f);
+    });
+    card.appendChild(meta);
+
+    const actions=document.createElement('div'); actions.className='mobile-actions';
+    if(me && (me.role==='ANGGOTA' || me.role==='ADMIN KECAMATAN')){
+      const eb=document.createElement('button'); eb.className='btn secondary'; eb.textContent='✏️ Edit'; eb.onclick=()=>editRow(r);
+      actions.appendChild(eb);
+      if(me.role==='ANGGOTA'){ const db=document.createElement('button'); db.className='btn danger'; db.textContent='🗑️ Hapus'; db.onclick=()=>delRow(r.ID); actions.appendChild(db); }
+      card.appendChild(actions);
+    }
+    list.appendChild(card);
+  });
+}
+
+async function ensureFormOptions(){
+  if(document.getElementById('fAktifitas').options.length>1) return;
+  const wilayah=await call('getWilayahTangsel');
+  const kc=document.getElementById('fKecamatan');
+  kc.innerHTML='<option value="">Pilih Kecamatan</option>'+Object.keys(wilayah).map(k=>`<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
+  const acts=[
+    'Pegawai Negeri Sipil (PNS) / ASN','Pegawai BUMN / BUMD','Karyawan Swasta','TNI / Polri',
+    'Wirawasta / Pengusaha / Pedagang','Profesional','Petani / Peternak / Nelayan',
+    'Buruh / Pekerja Harian Lepas','Pekerja Sektor Informal','Pelajar / Mahasiswa',
+    'Ibu Rumah Tangga','Pensiunan','Tidak Bekerja / Pengangguran','Pejabat Negara / Anggota Dewan','Lainnya'
+  ];
+  document.getElementById('fAktifitas').innerHTML='<option value="">Pilih Aktifitas</option>'+acts.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+}
+let formWilayah={};
+async function loadKelurahan(selected=''){
+  const kc=document.getElementById('fKecamatan'), kel=document.getElementById('fKelurahan');
+  if(!Object.keys(formWilayah).length) formWilayah=await call('getWilayahTangsel');
+  const list=formWilayah[kc.value]||[];
+  kel.innerHTML='<option value="">Pilih Kelurahan</option>'+list.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+  if(selected) kel.value=selected;
+}
+async function newForm(){
+  clearForm(); await ensureFormOptions();
+  document.getElementById('formTitle').textContent='Input Pendaftaran';
+  document.getElementById('formCard').classList.remove('hidden'); window.scrollTo(0,0);
+}
+async function editRow(r){
+  clearForm(); await ensureFormOptions();
+  document.getElementById('fID').value=r.ID||'';
+  document.getElementById('fTarget').value=r['NAMA TARGET']||'';
+  document.getElementById('fWA').value=r['NO WHATSAPP']||'';
+  document.getElementById('fAlamat').value=r['ALAMAT']||'';
+  document.getElementById('fRT').value=r['RT']||''; document.getElementById('fRW').value=r['RW']||'';
+  document.getElementById('fKecamatan').value=r['KECAMATAN']||'';
+  await loadKelurahan(r['KELURAHAN']||'');
+  setUplType(r['UPLS'], r['UPLM']);
+  document.getElementById('fAktifitas').value=r['AKTIFITAS']||'';
+  document.getElementById('fPenerimaan').value=r['TINGKAT PENERIMAAN']||'';
+  document.getElementById('fMetode').value=r['METODE']||''; document.getElementById('fStatus').value=r['STATUS']||'';
+  document.getElementById('fKet').value=r['KETERANGAN']||'';
+  document.getElementById('formTitle').textContent='Ubah Pendaftaran';
+  document.getElementById('formCard').classList.remove('hidden'); window.scrollTo(0,0);
+}
+function clearForm(){
+  ['fID','fTarget','fWA','fAlamat','fRT','fRW','fPenerimaan','fMetode','fStatus','fKet'].forEach(id=>document.getElementById(id).value='');
+  document.querySelectorAll('input[name="upl_type"]').forEach(el=>el.checked=false);
+  document.getElementById('fKecamatan').value=''; document.getElementById('fKelurahan').innerHTML='<option value="">Pilih Kelurahan</option>';
+  document.getElementById('fAktifitas').value=''; document.getElementById('formErr').textContent='';
+}
+function cancelForm(){document.getElementById('formCard').classList.add('hidden');clearForm();}
+function getSelectedUplType(){
+  const el=document.querySelector('input[name="upl_type"]:checked');
+  return el ? el.value : '';
+}
+function setUplType(upls,uplm){
+  const value=String(upls||'').trim() ? 'UPLS' : (String(uplm||'').trim() ? 'UPLM' : '');
+  document.querySelectorAll('input[name="upl_type"]').forEach(el=>el.checked=(el.value===value));
+}
+function payload(){
+  return {ID:document.getElementById('fID').value,'NAMA TARGET':document.getElementById('fTarget').value,'NO WHATSAPP':document.getElementById('fWA').value,
+    'ALAMAT':document.getElementById('fAlamat').value,'RT':document.getElementById('fRT').value,'RW':document.getElementById('fRW').value,
+    'KECAMATAN':document.getElementById('fKecamatan').value,'KELURAHAN':document.getElementById('fKelurahan').value,
+    'UPLS':getSelectedUplType()==='UPLS'?'UPLS':'','UPLM':getSelectedUplType()==='UPLM'?'UPLM':'','AKTIFITAS':document.getElementById('fAktifitas').value,
+    'TINGKAT PENERIMAAN':document.getElementById('fPenerimaan').value,'METODE':document.getElementById('fMetode').value,'STATUS':document.getElementById('fStatus').value,'KETERANGAN':document.getElementById('fKet').value};
+}
+async function saveForm(){
+  try{const p=payload(); if(p.ID) await call('updateRecruitment',token,p); else await call('saveRecruitment',token,p);
+    cancelForm(); await Promise.all([loadDashboard(),load()]); alert('Data berhasil disimpan.');
+  }catch(e){document.getElementById('formErr').textContent=e.message;}
+}
+
+async function delRow(id){
+  if(!confirm('Hapus data ini?'))return;
+  try{
+    await call('deleteRecruitment',token,id);
+    await Promise.all([loadDashboard(), load()]);
+  }catch(e){alert(e.message)}
+}
+
+async function changeMyPassword(){
+  const current=prompt('Password lama:'); if(current===null)return;
+  const next=prompt('Password baru (minimal 6 karakter):'); if(next===null)return;
+  const confirmNew=prompt('Ulangi password baru:'); if(confirmNew===null)return;
+  if(next!==confirmNew){alert('Konfirmasi password tidak sama.');return;}
+  try{await call('changePassword',token,current,next);alert('Password berhasil diubah.');}
+  catch(e){alert(e.message);}
+}
+
+
+function getExcelTemplateHeaders(){
+  return [
+    'NAMA TARGET','NO WHATSAPP','ALAMAT','RT','RW','KECAMATAN','KELURAHAN',
+    'UPLS','UPLM','AKTIFITAS','TINGKAT PENERIMAAN','METODE','STATUS','KETERANGAN'
+  ];
+}
+
+function downloadExcelTemplate(){
+  if(typeof XLSX==='undefined'){
+    alert('Library Excel belum termuat. Silakan refresh halaman lalu coba lagi.');
+    return;
+  }
+  const headers=getExcelTemplateHeaders();
+  const sample=[
+    'Contoh Nama Target','081234567890','Contoh alamat','01','02',
+    'Pamulang','Pamulang Barat','','',
+    'Karyawan Swasta','Terbuka','Dakwah Fardliyah','Proses','Contoh keterangan'
+  ];
+  const ws=XLSX.utils.aoa_to_sheet([
+    headers,
+    sample
+  ]);
+  ws['!cols']=headers.map((h,i)=>({wch: i===2?28:(i===13?30:20)}));
+  const guide=XLSX.utils.aoa_to_sheet([
+    ['PETUNJUK UPLOAD EXCEL'],
+    ['1','Jangan ubah nama header pada sheet TEMPLATE.'],
+    ['2','Satu baris = satu data target.'],
+    ['3','Kolom wajib: NAMA TARGET, NO WHATSAPP, KECAMATAN, KELURAHAN, AKTIFITAS, TINGKAT PENERIMAAN, METODE, STATUS.'],
+    ['4','NAMA ANGGOTA dan NAMA KECAMATAN pemilik akan diisi otomatis dari akun yang sedang login.'],
+    ['5','UPLS dan UPLM hanya boleh diisi salah satu.'],
+    ['6','Status yang tersedia: Berhasil, Proses, Pending, Gagal.'],
+    ['7','Setelah selesai, simpan file sebagai .xlsx lalu gunakan tombol Upload Excel.']
+  ]);
+  guide['!cols']=[{wch:12},{wch:100}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'TEMPLATE');
+  XLSX.utils.book_append_sheet(wb,guide,'PETUNJUK');
+  XLSX.writeFile(wb,'Template_Upload_Pendaftaran_TARBIYAH.xlsx');
+}
+
+function triggerExcelUpload(){
+  const input=document.getElementById('excelFileInput');
+  if(input){input.value='';input.click();}
+}
+
+function normalizeExcelHeader_(value){
+  return String(value==null?'':value).trim().toUpperCase().replace(/\s+/g,' ');
+}
+
+function handleExcelUpload(event){
+  const file=event.target.files&&event.target.files[0];
+  if(!file)return;
+  if(typeof XLSX==='undefined'){
+    alert('Library Excel belum termuat. Silakan refresh halaman lalu coba lagi.');
+    return;
+  }
+
+  const reader=new FileReader();
+  reader.onload=async function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const sheetName=wb.SheetNames.includes('TEMPLATE')?'TEMPLATE':wb.SheetNames[0];
+      const ws=wb.Sheets[sheetName];
+      const raw=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+      if(!raw.length){alert('File Excel tidak memiliki data.');return;}
+
+      const required=getExcelTemplateHeaders();
+      const mapped=raw.map((row,idx)=>{
+        const normalized={};
+        Object.keys(row).forEach(k=>normalized[normalizeExcelHeader_(k)]=row[k]);
+        const item={};
+        required.forEach(h=>item[h]=String(normalized[normalizeExcelHeader_(h)]==null?'':normalized[normalizeExcelHeader_(h)]).trim());
+        item.__row=idx+2;
+        return item;
+      });
+
+      const meaningful=mapped.filter(r=>required.some(h=>r[h]!==''));      
+      if(!meaningful.length){alert('Tidak ada baris data yang dapat di-upload.');return;}
+
+      const missing=[];
+      meaningful.forEach(r=>{
+        required.filter(h=>['NAMA TARGET','NO WHATSAPP','KECAMATAN','KELURAHAN','AKTIFITAS','TINGKAT PENERIMAAN','METODE','STATUS'].includes(h))
+          .forEach(h=>{if(!r[h])missing.push(`Baris ${r.__row}: ${h}`);});
+      });
+      if(missing.length){
+        alert('Validasi gagal. Lengkapi data berikut:\\n\\n'+missing.slice(0,20).join('\\n')+(missing.length>20?'\\n...':''));
+        return;
+      }
+
+      meaningful.forEach(r=>delete r.__row);
+      if(meaningful.length>1000){
+        alert('Maksimal 1.000 baris per upload.');
+        return;
+      }
+
+      const confirmed=confirm(`Upload ${meaningful.length.toLocaleString('id-ID')} data dari "${file.name}"?\\n\\nData akan divalidasi di server sebelum disimpan.`);
+      if(!confirmed)return;
+
+      const uploadBtn=document.getElementById('uploadBtn');
+      if(uploadBtn){uploadBtn.disabled=true;uploadBtn.textContent='⏳ Mengupload...';}
+      try{
+        const result=await call('uploadRecruitments',token,meaningful);
+        alert(`Upload berhasil. ${Number(result.count||0).toLocaleString('id-ID')} data ditambahkan.`);
+        await Promise.all([loadDashboard(),load()]);
+      }catch(err){
+        alert('Upload gagal: '+err.message);
+      }finally{
+        if(uploadBtn){uploadBtn.disabled=false;uploadBtn.textContent='⬆ Upload Excel';}
+      }
+    }catch(err){
+      alert('File Excel tidak dapat dibaca: '+err.message);
+    }finally{
+      event.target.value='';
+    }
+  };
+  reader.onerror=()=>alert('Gagal membaca file Excel.');
+  reader.readAsArrayBuffer(file);
+}
+
+async function exportExcel(){
+  try{
+    const result=await call('getRecruitmentsForExport',token);
+    const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const head=result.headers.map(x=>`<th>${esc(x)}</th>`).join('');
+    const body=result.rows.map(row=>`<tr>${row.map(x=>`<td>${esc(x)}</td>`).join('')}</tr>`).join('');
+    const blob=new Blob([`<html><head><meta charset="UTF-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`],
+      {type:'application/vnd.ms-excel;charset=utf-8'});
+    const url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download=result.filename||'Pendaftaran_TARBIYAH.xls'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }catch(e){alert('Gagal export Excel: '+e.message);}
+}
+
+/* =========================
+   SYSTEM ADMIN - USER
+   ========================= */
+
+async function loadUsers(){
+  try{
+    const result=await call('getUsers',token);
+    users=Array.isArray(result)?result:[];
+    renderUsers();
+  }catch(e){
+    alert('Gagal memuat user: '+e.message);
+  }
+}
+
+function showCreateUser(){
+  document.getElementById('userForm').classList.remove('hidden');
+  document.getElementById('userFormErr').textContent='';
+  document.getElementById('uUsername').value='';
+  document.getElementById('uPassword').value='';
+  document.getElementById('uRole').value='ANGGOTA';
+  document.getElementById('uAnggota').value='';
+  document.getElementById('uKecamatan').value='';
+  updateUserFields();
+}
+
+function hideCreateUser(){
+  document.getElementById('userForm').classList.add('hidden');
+}
+
+function updateUserFields(){
+  const role=document.getElementById('uRole').value;
+  const anggotaWrap=document.getElementById('uAnggotaWrap');
+  const kecamatanWrap=document.getElementById('uKecamatanWrap');
+
+  anggotaWrap.classList.toggle('hidden',role==='ADMIN PTD'||role==='SYSTEM ADMIN');
+  kecamatanWrap.classList.toggle('hidden',role==='ADMIN PTD'||role==='SYSTEM ADMIN');
+}
+
+async function createUserFromUI(){
+  const err=document.getElementById('userFormErr');
+  err.textContent='';
+
+  try{
+    const username=document.getElementById('uUsername').value.trim();
+    const password=document.getElementById('uPassword').value;
+    const role=document.getElementById('uRole').value;
+    const anggota=document.getElementById('uAnggota').value.trim();
+    const kecamatan=document.getElementById('uKecamatan').value.trim();
+
+    /*await call('createUser',token,username,password,role,anggota,kecamatan);*/
+    await call('createUser',username,password,role,anggota,kecamatan);
+
+    hideCreateUser();
+    await loadUsers();
+    alert('User berhasil dibuat.');
+  }catch(e){err.textContent=e.message}
+}
+
+function renderUsers(){
+  const tbody=document.getElementById('userTbody');
+  const input=document.getElementById('userSearch');
+  if(!tbody)return;
+
+  const keyword=input?input.value.trim().toLowerCase():'';
+  tbody.innerHTML='';
+
+  const filtered=users.filter(u=>{
+    if(!keyword)return true;
+    return [
+      u.username,u.role,u.anggota,u.kecamatan,u.active?'aktif':'nonaktif'
+    ].join(' ').toLowerCase().includes(keyword);
+  });
+
+  if(filtered.length===0){
+    tbody.innerHTML=`<tr><td colspan="7" class="empty">Tidak ada user.</td></tr>`;
+    renderMobileUsers(filtered);
+    return;
+  }
+
+  filtered.forEach((u,index)=>{
+    const tr=document.createElement('tr');
+    const td=value=>{
+      const c=document.createElement('td');
+      c.textContent=value==null?'':String(value);
+      return c;
+    };
+
+    tr.appendChild(td(index+1));
+    tr.appendChild(td(u.username));
+    tr.appendChild(td(u.role));
+    tr.appendChild(td(u.anggota));
+    tr.appendChild(td(u.kecamatan));
+
+    const status=document.createElement('td');
+    const pill=document.createElement('span');
+    pill.className='pill '+(u.active?'green':'gray');
+    pill.textContent=u.active?'Aktif':'Nonaktif';
+    status.appendChild(pill);
+    tr.appendChild(status);
+
+    const action=document.createElement('td');
+    action.className='actions';
+
+    const resetBtn=document.createElement('button');
+    resetBtn.className='btn secondary';
+    resetBtn.textContent='Reset Password';
+    resetBtn.style.marginRight='5px';
+    resetBtn.onclick=()=>resetUserPassword(u.username);
+
+    action.appendChild(resetBtn);
+
+    if(u.username.toLowerCase()!==me.username.toLowerCase()){
+      const activeBtn=document.createElement('button');
+      activeBtn.className=u.active?'btn danger':'btn primary';
+      activeBtn.textContent=u.active?'Nonaktifkan':'Aktifkan';
+      activeBtn.onclick=()=>toggleUser(u);
+      action.appendChild(activeBtn);
+    }
+
+    tr.appendChild(action);
+    tbody.appendChild(tr);
+  });
+  renderMobileUsers(filtered);
+}
+
+function renderMobileUsers(filtered){
+  const list=document.getElementById('userMobileList');
+  if(!list)return;
+  list.innerHTML='';
+  if(!filtered.length){
+    const e=document.createElement('div'); e.className='mobile-empty'; e.textContent='Tidak ada user.'; list.appendChild(e); return;
+  }
+  filtered.forEach((u,index)=>{
+    const card=document.createElement('div'); card.className='mobile-card user-mobile-card';
+    const title=document.createElement('div'); title.className='mobile-card-title'; title.textContent=`${index+1}. ${u.username}`; card.appendChild(title);
+    const meta=document.createElement('div'); meta.className='mobile-meta';
+    [['Role',u.role],['Nama Anggota',u.anggota],['KECAMATAN',u.kecamatan]].forEach(([label,value])=>{
+      const f=document.createElement('div'); f.className='mobile-field';
+      const l=document.createElement('span'); l.className='mobile-label'; l.textContent=label;
+      const v=document.createElement('div'); v.className='mobile-value'; v.textContent=value||'-';
+      f.append(l,v); meta.appendChild(f);
+    });
+    const sf=document.createElement('div'); sf.className='mobile-field';
+    const sl=document.createElement('span'); sl.className='mobile-label'; sl.textContent='Status';
+    const sp=document.createElement('span'); sp.className='pill '+(u.active?'green':'gray'); sp.textContent=u.active?'Aktif':'Nonaktif';
+    sf.append(sl,sp); meta.appendChild(sf); card.appendChild(meta);
+    const actions=document.createElement('div'); actions.className='mobile-actions';
+    const rb=document.createElement('button'); rb.className='btn secondary'; rb.textContent='🔑 Reset Password'; rb.onclick=()=>resetUserPassword(u.username); actions.appendChild(rb);
+    if(u.username.toLowerCase()!==me.username.toLowerCase()){
+      const ab=document.createElement('button'); ab.className=u.active?'btn danger':'btn primary'; ab.textContent=u.active?'🔴 Nonaktifkan':'🟢 Aktifkan'; ab.onclick=()=>toggleUser(u); actions.appendChild(ab);
+    }
+    card.appendChild(actions); list.appendChild(card);
+  });
+}
+
+async function resetUserPassword(username){
+  const newPassword=prompt(
+    `Masukkan password baru untuk "${username}".\\nMinimal 6 karakter:`
+  );
+  if(newPassword===null)return;
+
+  if(newPassword.length<6){
+    alert('Password minimal 6 karakter.');
+    return;
+  }
+
+  try{
+    await call('resetPassword',token,username,newPassword);
+    alert('Password berhasil di-reset.');
+  }catch(e){alert(e.message)}
+}
+
+async function toggleUser(u){
+  const action=u.active?'menonaktifkan':'mengaktifkan';
+  if(!confirm(`Yakin ingin ${action} user "${u.username}"?`))return;
+
+  try{
+    await call('setUserActive',token,u.username,!u.active);
+    await loadUsers();
+  }catch(e){alert(e.message)}
+}
+
+async function doLogout(){
+  if(token)try{await call('logout',token)}catch(e){}
+  sessionStorage.removeItem('token');
+  token='';me=null;rows=[];users=[];registrations=[];currentPage=1;totalRows=0;totalPages=1;
+  document.getElementById('appView').classList.add('hidden');
+  document.getElementById('loginView').classList.remove('hidden');
+}
+
+(async()=>{
+  const t=sessionStorage.getItem('token');
+  if(t){
+    try{
+      me=await call('getMe',t);
+      token=t;
+      const hasSecurity=await call('hasSecurityQuestions',t);
+      if(!hasSecurity){pendingSecurityToken=t;hideAuthViews();fillQuestionSelect('setupQ1');fillQuestionSelect('setupQ2');document.getElementById('securitySetupView').classList.remove('hidden');return;}
+      showApp();
+      await Promise.all([loadDashboard(), load()]);
+      if(me.role==='SYSTEM ADMIN') await loadUsers();
+    }catch(e){
+      sessionStorage.removeItem('token');
+    }
+  }
+})();
+</script>
+</body>
+</html>

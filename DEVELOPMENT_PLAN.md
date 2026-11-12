@@ -225,6 +225,17 @@ Vue 3 + Vue Router + Vite. Sumber: `frontend/src/`.
 | D-101 | **Integrasi WhatsApp kirim pesan** | ⬜ | §11 — *di luar scope MVP* |
 | D-102 | **Workflow persetujuan berjenjang** | ⬜ | §11 — *di luar scope MVP* |
 | D-103 | **Sinkronisasi dua arah Supabase↔Sheets** | ⬜ | §11 — *di luar scope MVP* |
+| D-165 | **Login memakai akun aplikasi lama (tab `USERS`)** | ✅ | `internal/store/sheets/users.go`, `internal/auth` |
+| D-166 | **Pemetaan peran aplikasi lama → peran baru** | ✅ | `SYSTEM ADMIN`/`ADMIN PTD`/`ADMIN KECAMATAN` → `admin`, `ANGGOTA` → `petugas` |
+| D-167 | **Pemindahan akun lama ke hash PBKDF2 saat login pertama** | ✅ | `Manager.MigrateLegacyUser`, mode `upgrade` |
+| D-168 | **Mode login warisan (`upgrade`/`sheet`/`off`)** | ✅ | env `LEGACY_AUTH_MODE` |
+| D-169 | **Penolakan akun tidak aktif / tanpa hash** | ✅ | `AKTIF` harus `Y`, `PASSWORD_HASH` wajib terisi |
+| D-170 | **Batas laju login warisan** | ⬜ | D-83 masih terbuka; hash SHA-256 tanpa salt mudah dipecah |
+| D-171 | **Migrasi 161 akun aplikasi lama ke direktori pengguna** | 🔧 | sebagian: akun aktif otomatis saat login pertama; 8 akun tanpa hash belum bisa masuk |
+| D-172 | **Daftar anggota mandiri (self-registration)** | ✅ | `POST /api/register`, `internal/store/sheets/register.go`, `LoginView.vue` |
+| D-173 | **Akun baru memakai hash SHA-256 yang sama dengan aplikasi lama** | ✅ | password & jawaban keamanan di-hash SHA-256 tanpa salt,role `ANGGOTA`, `AKTIF`=`Y` |
+| D-174 | **Batas laju pendaftaran mandiri** | ✅ | 10 percobaan per alamat per 10 menit (`internal/api/register.go`) |
+| D-175 | **Pilihan pertanyaan keamanan & kecamatan untuk form daftar** | ✅ | `GET /api/register/options` |
 
 > D-99 s.d. D-103 secara eksplisit **di luar scope MVP**. Item-item ini dicatat
 > agar tidak hilang, bukan untuk dikerjakan sekarang.

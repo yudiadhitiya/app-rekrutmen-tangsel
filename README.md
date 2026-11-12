@@ -68,6 +68,20 @@ Environment (opsional):
 | `SUPABASE_API_KEY`  | service-role key Supabase                               |
 | `GOOGLE_SHEET_ID`   | ID spreadsheet Google Sheets                            |
 | `GOOGLE_KEY_FILE`   | path file JSON service account Google                   |
+| `GOOGLE_SHEETS_MODE` | `app` (tab milik aplikasi) atau `form` (tab respons formulir), default `app` |
+| `GOOGLE_SHEETS_TAB_REKRUTMEN` | nama tab data rekrutmen, default `Rekrutmen` |
+| `GOOGLE_SHEETS_TAB_AKTIVITAS` | nama tab master aktivitas, default `Aktivitas` |
+| `GOOGLE_SHEETS_TAB_SUMBER`    | nama tab sumber untuk impor, default `Form Responses 1` |
+| `GOOGLE_SHEETS_TAB_PENGGUNA`  | nama tab akun app lama, default `USERS` |
+| `LEGACY_AUTH_MODE`            | `upgrade` (default), `sheet`, atau `off` — cara memakai akun app lama |
+
+Backend membaca konfigurasi langsung dari environment; tidak ada file `.env`
+yang dimuat otomatis. Untuk pengembangan, ekspor variabelnya di shell:
+
+```bash
+export GOOGLE_SHEET_ID=1AbCdEf...
+export GOOGLE_KEY_FILE="$HOME/.config/rekrutmen-tangsel/google-key.json"
+```
 
 ### Frontend
 
@@ -109,6 +123,85 @@ backend, akses langsung dari browser ditolak.
 
 Tab `Rekrutmen` dan `Aktivitas` beserta header-nya dibuat otomatis saat
 provider pertama kali dipakai.
+
+### Lokasi file kredensial
+
+File JSON service account berisi private key yang memberi akses baca/tulis ke
+seluruh spreadsheet yang dibagikan ke akun tersebut. Backend menolak file yang
+izinnya lebih longgar dari `0600`:
+
+```bash
+mkdir -p ~/.config/rekrutmen-tangsel
+cp service-account.json ~/.config/rekrutmen-tangsel/google-key.json
+chmod 600 ~/.config/rekrutmen-tangsel/google-key.json
+```
+
+Di server produksi, letakkan file di `/etc/rekrutmen-tangsel/google-key.json`
+dengan izin `0600`, lalu isi `GOOGLE_KEY_FILE` di
+`/etc/rekrutmen-tangsel.env`. Nama file kredensial umum sudah masuk
+`.gitignore`, tetapi file tetap sebaiknya diletakkan di luar repo.
+
+### Masuk dengan akun dari aplikasi lama
+
+Aplikasi ini bisa menerima akun dari aplikasi lama (Google Apps Script) yang
+datanya berada di tab `USERS` spreadsheet yang sama. Akun lama disimpan dengan
+hash SHA-256 tanpa salt, sehingga tidak bisa dipakai ulang oleh aplikasi ini
+sebagai hash.
+
+Mekanismenya: saat pertama kali login, kredensial dicek ke tab `USERS`. Kalau cocok,
+akun itu langsung disimpan di `data/users.json` dengan hash PBKDF2 bersalt —
+jadi login berikutnya tidak perlu menyentuh spreadsheet lagi.
+
+| `LEGACY_AUTH_MODE` | Perilaku |
+| --- | --- |
+| `upgrade` (default) | login pertama memakai akun lama, lalu akun disimpan lokal |
+| `sheet` | setiap login dicek ke tab `USERS`; akun tidak disalin lokal |
+| `off` | akun lama tidak dipakai sama sekali |
+
+Peran dipetakan: `SYSTEM ADMIN`, `ADMIN PTD`, `ADMIN KECAMATAN` menjadi
+`admin`; `ANGGOTA` menjadi `petugas`. Akun dengan `AKTIF` selain `Y` dan akun
+tanpa `PASSWORD_HASH` tidak dapat masuk.
+
+### Daftar anggota mandiri (self-registration)
+
+Halaman login punya tombol **Belum punya akun? Daftar anggota**. Formulirnya
+minta username, kata sandi, nama, kecamatan, dan dua pertanyaan keamanan.
+
+Akun baru ditulis ke tab `USERS` dengan layout yang sama seperti aplikasi lama:
+peran `ANGGOTA`, `AKTIF` = `Y`, serta password dan kedua jawaban keamanan
+disimpan sebagai hash SHA-256 tanpa salt. Jadi akun itu langsung aktif dan bisa
+dipakai di kedua aplikasi. Pada login pertama, akun dimindahkan ke penyimpanan
+lokal dengan hash PBKDF2 bersalt.
+
+Syaratnya: `GOOGLE_SHEET_ID` dan `GOOGLE_KEY_FILE` terisi (agar tab `USERS`
+bisa ditulis) dan `LEGACY_AUTH_MODE` bukan `off`. Tanpa itu, endpoint
+pendaftaran menjawab `503` dan tombol pendaftaran disembunyikan.
+
+Endpoint publiknya:
+
+| Endpoint | Fungsi |
+| --- | --- |
+| `GET /api/register/options` | daftar pertanyaan keamanan dan kecamatan |
+| `POST /api/register` | membuat akun anggota baru |
+
+Pendaftaran dibatasi 10 percobaan per alamat dalam 10 menit, dan username
+yang sudah dipakai ditolak dengan `409`.
+
+### Mengimpor data dari Google Form
+
+Untuk spreadsheet yang berisi respons Google Form, gunakan perkakas impor.
+Tagian dipetakan otomatis berdasarkan nama kolom, dan impor bersifat
+*tambah-saja*: baris yang nomornya sudah ada dilewati, sehingga aman
+dijalankan berkali-kali.
+
+```bash
+cd backend
+go run ./cmd/impor-responses --dry-run              # hanya rencana
+go run ./cmd/impor-responses --apply --report ../data/impor-responses-report.json
+```
+
+Tanpa `--apply` tidak ada yang ditulis ke spreadsheet. Rincian rencana dan
+baris yang perlu diperiksa ada di file laporan.
 
 ## Test
 

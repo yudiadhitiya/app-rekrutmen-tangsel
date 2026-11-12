@@ -11,6 +11,7 @@ import (
 	"rekrutmen-tangsel/backend/internal/api"
 	"rekrutmen-tangsel/backend/internal/auth"
 	"rekrutmen-tangsel/backend/internal/settings"
+	"rekrutmen-tangsel/backend/internal/store/sheets"
 )
 
 func env(key, fallback string) string {
@@ -48,6 +49,35 @@ func main() {
 		log.Fatalf("gagal memuat pengguna: %v", err)
 	}
 	authMgr := auth.NewManager(users, secret)
+	authMgr.SetUsersPath(filepath.Join(dataDir, "users.json"))
+
+	// Accounts of the previous application live in the USERS sheet of the
+	// spreadsheet. When it is configured, a user can sign in with the
+	// credentials they already had.
+	legacyMode := env("LEGACY_AUTH_MODE", "upgrade")
+	if legacyMode == "off" {
+		log.Printf("login warisan dimatikan (LEGACY_AUTH_MODE=off)")
+	} else if os.Getenv("GOOGLE_SHEET_ID") != "" && os.Getenv("GOOGLE_KEY_FILE") != "" {
+		legacyStore, lerr := sheets.New(sheets.Config{
+			SpreadsheetID: os.Getenv("GOOGLE_SHEET_ID"),
+			KeyFile:       os.Getenv("GOOGLE_KEY_FILE"),
+			TabPengguna:   os.Getenv("GOOGLE_SHEETS_TAB_PENGGUNA"),
+		})
+		if lerr != nil {
+			log.Printf("login warisan tidak aktif: %v", lerr)
+		} else {
+			authMgr.SetLegacyAuthenticator(legacyStore)
+			// New member accounts are written to the same sheet, so a member
+			// can sign in with them in both applications.
+			authMgr.SetRegistrar(legacyStore)
+			tabPengguna := os.Getenv("GOOGLE_SHEETS_TAB_PENGGUNA")
+			if tabPengguna == "" {
+				tabPengguna = sheets.DefaultTabPengguna
+			}
+			log.Printf("login warisan aktif dari sheet %q (mode: %s)", tabPengguna, legacyMode)
+			log.Printf("pendaftaran anggota menulis ke sheet %q", tabPengguna)
+		}
+	}
 
 	setStore, err := settings.NewStore(filepath.Join(dataDir, "settings.json"))
 	if err != nil {
@@ -60,6 +90,13 @@ func main() {
 		SupabaseAPIKey: os.Getenv("SUPABASE_API_KEY"),
 		GoogleSheetID:  os.Getenv("GOOGLE_SHEET_ID"),
 		GoogleKeyFile:  os.Getenv("GOOGLE_KEY_FILE"),
+
+		GoogleSheetsMode:         os.Getenv("GOOGLE_SHEETS_MODE"),
+		GoogleSheetsTabRekrutmen: os.Getenv("GOOGLE_SHEETS_TAB_REKRUTMEN"),
+		GoogleSheetsTabAktivitas: os.Getenv("GOOGLE_SHEETS_TAB_AKTIVITAS"),
+		GoogleSheetsTabSumber:    os.Getenv("GOOGLE_SHEETS_TAB_SUMBER"),
+		GoogleSheetsTabPengguna:  os.Getenv("GOOGLE_SHEETS_TAB_PENGGUNA"),
+		LegacyAuthMode:           legacyMode,
 	}
 
 	srv, err := api.New(cfg, authMgr, setStore)

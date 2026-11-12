@@ -30,16 +30,66 @@ import (
 )
 
 const (
-	// SheetRekrutmen and SheetAktivitas are the tab names used in the spreadsheet.
-	SheetRekrutmen = "Rekrutmen"
-	SheetAktivitas = "Aktivitas"
+	// Default tab names used when the configuration does not name them.
+	DefaultTabRekrutmen = "Rekrutmen"
+	DefaultTabAktivitas = "Aktivitas"
+
+	// SheetRekrutmen and SheetAktivitas are the default tab names used in the
+	// spreadsheet.
+	SheetRekrutmen = DefaultTabRekrutmen
+	SheetAktivitas = DefaultTabAktivitas
 
 	tokenURL = "https://oauth2.googleapis.com/token"
 	scope    = "https://www.googleapis.com/auth/spreadsheets"
 
 	// sheetsAPI is the Google Sheets API root.
 	sheetsAPI = "https://sheets.googleapis.com/v4/spreadsheets"
+
+	// defaultColumns is the column count assumed for a tab whose size is not
+	// known yet.
+	defaultColumns = 26
+
+	// tabsCacheTTL is how long the spreadsheet tab list is cached.
+	tabsCacheTTL = 60 * time.Second
 )
+
+// Modes for the Sheets provider.
+const (
+	// ModeApp means the application owns its tabs inside the spreadsheet: it
+	// creates them when missing and stores its records there.
+	ModeApp = "app"
+
+	// ModeForm means the application reads an existing Google Form response
+	// tab. In this mode the provider never creates a tab; it only verifies
+	// that the configured tab exists.
+	ModeForm = "form"
+)
+
+// Config configures a Google Sheets backed Store.
+type Config struct {
+	// SpreadsheetID is the id of the target spreadsheet.
+	SpreadsheetID string
+
+	// KeyFile is the path to the service-account JSON key.
+	KeyFile string
+
+	// TabRekrutmen is the tab holding the recruitment records.
+	TabRekrutmen string
+
+	// TabAktivitas is the tab holding the master activity list.
+	TabAktivitas string
+
+	// TabSumber is the tab holding the source rows to import. It is only used
+	// in ModeForm.
+	TabSumber string
+
+	// TabPengguna is the tab holding the accounts of the previous
+	// application. It is used to sign in with the old credentials.
+	TabPengguna string
+
+	// Mode is ModeApp or ModeForm. An empty value means ModeApp.
+	Mode string
+}
 
 // Store is a Google Sheets backed Store.
 type Store struct {
@@ -51,9 +101,34 @@ type Store struct {
 	// store at a fake server.
 	baseURL string
 
+	// tabRekrutmen, tabAktivitas, tabSumber and tabPengguna are the
+	// configured tab names.
+	tabRekrutmen string
+	tabAktivitas string
+	tabSumber    string
+	tabPengguna  string
+
+	// mode is ModeApp or ModeForm.
+	mode string
+
 	mu        sync.Mutex
 	accessTok string
 	tokExpiry time.Time
+
+	// tabsMu guards the cached tab list.
+	tabsMu  sync.Mutex
+	tabs    []sheetInfo
+	tabsAt  time.Time
+	tabsErr error
+}
+
+// sheetInfo describes one tab of the spreadsheet.
+type sheetInfo struct {
+	// Title is the tab name.
+	Title string
+
+	// Columns is the number of columns of the tab's grid.
+	Columns int
 }
 
 // serviceKey holds the fields of a Google service-account JSON key.
@@ -63,9 +138,21 @@ type serviceKey struct {
 	TokenURI    string `json:"token_uri"`
 }
 
-// New builds a Store from a spreadsheet ID and a service-account key file.
-func New(spreadsheetID, keyFile string) (*Store, error) {
-	raw, err := os.ReadFile(keyFile)
+// New builds a Store from a configuration.
+//
+// The tab names and the mode are taken from cfg; empty values fall back to
+// the defaults, so a caller that only knows the spreadsheet id and the key
+// file still gets a working store.
+func New(cfg Config) (*Store, error) {
+	spreadsheetID, err := normalizeSpreadsheetID(cfg.SpreadsheetID)
+	if err != nil {
+		return nil, err
+	}
+	cfg.SpreadsheetID = spreadsheetID
+	if err := checkKeyFilePerm(cfg.KeyFile); err != nil {
+		return nil, err
+	}
+	raw, err := os.ReadFile(cfg.KeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("google sheets: baca kunci: %w", err)
 	}
@@ -79,11 +166,31 @@ func New(spreadsheetID, keyFile string) (*Store, error) {
 	if k.TokenURI == "" {
 		k.TokenURI = tokenURL
 	}
+	if cfg.TabRekrutmen == "" {
+		cfg.TabRekrutmen = DefaultTabRekrutmen
+	}
+	if cfg.TabAktivitas == "" {
+		cfg.TabAktivitas = DefaultTabAktivitas
+	}
+	if cfg.TabPengguna == "" {
+		cfg.TabPengguna = DefaultTabPengguna
+	}
+	if cfg.Mode == "" {
+		cfg.Mode = ModeApp
+	}
+	if cfg.Mode != ModeApp && cfg.Mode != ModeForm {
+		return nil, fmt.Errorf("google sheets: mode tidak dikenal: %s", cfg.Mode)
+	}
 	return &Store{
-		spreadsheetID: spreadsheetID,
+		spreadsheetID: cfg.SpreadsheetID,
 		key:           &k,
 		http:          &http.Client{Timeout: 30 * time.Second},
 		baseURL:       sheetsAPI,
+		tabRekrutmen:  cfg.TabRekrutmen,
+		tabAktivitas:  cfg.TabAktivitas,
+		tabSumber:     cfg.TabSumber,
+		tabPengguna:   cfg.TabPengguna,
+		mode:          cfg.Mode,
 	}, nil
 }
 
@@ -91,9 +198,17 @@ func New(spreadsheetID, keyFile string) (*Store, error) {
 func (s *Store) Name() string { return "google_sheets" }
 
 // Ping verifies the spreadsheet is readable.
+//
+// In ModeApp it also prepares the tabs the application owns: they are created
+// with their header row when missing, so the first run works without manual
+// setup. In ModeForm it only checks that the configured source tab exists and
+// never writes to the spreadsheet.
 func (s *Store) Ping() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	if s.mode == ModeForm {
+		return s.checkSourceTab(ctx)
+	}
 	// A fresh spreadsheet has no tabs yet; create them with their headers so
 	// the first run works without manual setup.
 	return s.ensureTabs(ctx)
@@ -101,37 +216,181 @@ func (s *Store) Ping() error {
 
 // ensureTabs creates the two tabs with their header row when they are missing.
 func (s *Store) ensureTabs(ctx context.Context) error {
+	tabs, err := s.listTabs(ctx)
+	if err != nil {
+		return err
+	}
 	for _, spec := range []struct {
 		sheet   string
 		headers []string
 	}{
-		{SheetRekrutmen, rekrutmenHeaders},
-		{SheetAktivitas, aktivitasHeaders},
+		{s.tabRekrutmen, rekrutmenHeaders},
+		{s.tabAktivitas, aktivitasHeaders},
 	} {
-		rows, err := s.readSheet(ctx, spec.sheet)
-		if err != nil {
-			// The tab does not exist yet; create it below.
-			if !s.isMissingTab(err) {
+		if !hasTab(tabs, spec.sheet) {
+			if err := s.createSheet(ctx, spec.sheet); err != nil {
 				return err
 			}
-			rows = nil
-		}
-		if len(rows) > 0 {
+			if err := s.appendRow(ctx, spec.sheet, spec.headers); err != nil {
+				return err
+			}
 			continue
 		}
-		if err := s.createSheet(ctx, spec.sheet); err != nil {
+		rows, err := s.readSheet(ctx, spec.sheet)
+		if err != nil {
 			return err
 		}
-		if err := s.appendRow(ctx, spec.sheet, spec.headers); err != nil {
-			return err
+		if len(rows) == 0 {
+			if err := s.appendRow(ctx, spec.sheet, spec.headers); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-// isMissingTab reports whether the error means the tab does not exist.
-func (s *Store) isMissingTab(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "Unable to parse range")
+// checkSourceTab verifies that the tab holding the source rows exists.
+//
+// In ModeForm the provider must never create a tab, because the spreadsheet
+// belongs to a Google Form and its tab layout is fixed by the form.
+func (s *Store) checkSourceTab(ctx context.Context) error {
+	if s.tabSumber == "" {
+		return fmt.Errorf("google sheets: tab sumber belum dikonfigurasi")
+	}
+	tabs, err := s.listTabs(ctx)
+	if err != nil {
+		return err
+	}
+	if !hasTab(tabs, s.tabSumber) {
+		return fmt.Errorf("google sheets: tab %q tidak ditemukan; tab yang ada: %s",
+			s.tabSumber, strings.Join(tabTitles(tabs), ", "))
+	}
+	return nil
+}
+
+// hasTab reports whether the list contains a tab with the given title.
+func hasTab(tabs []sheetInfo, title string) bool {
+	for _, t := range tabs {
+		if t.Title == title {
+			return true
+		}
+	}
+	return false
+}
+
+// tabTitles returns the titles of the given tabs.
+func tabTitles(tabs []sheetInfo) []string {
+	out := make([]string, 0, len(tabs))
+	for _, t := range tabs {
+		out = append(out, t.Title)
+	}
+	return out
+}
+
+// listTabs returns the tabs of the spreadsheet.
+//
+// The result is cached briefly, because every read needs to know the tab
+// layout and the metadata endpoint is one request on its own.
+func (s *Store) listTabs(ctx context.Context) ([]sheetInfo, error) {
+	s.tabsMu.Lock()
+	defer s.tabsMu.Unlock()
+	if s.tabs != nil && time.Since(s.tabsAt) < tabsCacheTTL {
+		return s.tabs, nil
+	}
+	tabs, err := s.fetchTabs(ctx)
+	if err != nil {
+		// A stale list is better than failing the request outright, but only
+		// when one was ever fetched successfully.
+		if s.tabs != nil {
+			return s.tabs, nil
+		}
+		return nil, err
+	}
+	s.tabs = tabs
+	s.tabsAt = time.Now()
+	return tabs, nil
+}
+
+// invalidateTabs drops the cached tab list after the spreadsheet changed.
+func (s *Store) invalidateTabs() {
+	s.tabsMu.Lock()
+	defer s.tabsMu.Unlock()
+	s.tabs = nil
+}
+
+// fetchTabs reads the spreadsheet metadata and returns its tabs.
+func (s *Store) fetchTabs(ctx context.Context) ([]sheetInfo, error) {
+	tok, err := s.token(ctx)
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("%s/%s", s.baseURL, url.PathEscape(s.spreadsheetID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("google sheets: metadata spreadsheet: %d: %s", resp.StatusCode, string(body))
+	}
+	var out struct {
+		Sheets []struct {
+			Properties struct {
+				Title          string `json:"title"`
+				GridProperties struct {
+					ColumnCount int `json:"columnCount"`
+				} `json:"gridProperties"`
+			} `json:"properties"`
+		} `json:"sheets"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("google sheets: parse metadata: %w", err)
+	}
+	tabs := make([]sheetInfo, 0, len(out.Sheets))
+	for _, sh := range out.Sheets {
+		cols := sh.Properties.GridProperties.ColumnCount
+		if cols <= 0 {
+			cols = defaultColumns
+		}
+		tabs = append(tabs, sheetInfo{Title: sh.Properties.Title, Columns: cols})
+	}
+	return tabs, nil
+}
+
+// tabColumns returns the column count of a tab, falling back to the standard
+// 26 columns when the tab is unknown.
+func (s *Store) tabColumns(ctx context.Context, tab string) int {
+	tabs, err := s.listTabs(ctx)
+	if err != nil {
+		return defaultColumns
+	}
+	for _, t := range tabs {
+		if t.Title == tab {
+			return t.Columns
+		}
+	}
+	return defaultColumns
+}
+
+// colLetter converts a 1-based column number to its spreadsheet letter, so
+// column 27 becomes "AA".
+func colLetter(n int) string {
+	if n <= 0 {
+		n = defaultColumns
+	}
+	letters := ""
+	for n > 0 {
+		n--
+		letters = string(rune('A'+(n%26))) + letters
+		n /= 26
+	}
+	return letters
 }
 
 // createSheet adds a new tab to the spreadsheet.
@@ -140,8 +399,8 @@ func (s *Store) createSheet(ctx context.Context, sheet string) error {
 	if err != nil {
 		return err
 	}
-	u := fmt.Sprintf("%s/%s?includeGridData=false",
-		s.baseURL, url.PathEscape(s.spreadsheetID))
+	// A tab is added through the batchUpdate endpoint of the spreadsheet.
+	u := fmt.Sprintf("%s/%s:batchUpdate", s.baseURL, url.PathEscape(s.spreadsheetID))
 	b, err := json.Marshal(map[string]any{
 		"requests": []map[string]any{{
 			"addSheet": map[string]any{"properties": map[string]any{"title": sheet}},
@@ -164,6 +423,57 @@ func (s *Store) createSheet(ctx context.Context, sheet string) error {
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("google sheets: create tab %s: %d: %s", sheet, resp.StatusCode, string(body))
+	}
+	s.invalidateTabs()
+	return nil
+}
+
+// normalizeSpreadsheetID accepts either a bare spreadsheet id or the full
+// sheet URL, because the id is usually copied out of the browser address bar.
+//
+// The returned id is the part between "/d/" and the next path separator.
+func normalizeSpreadsheetID(v string) (string, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "", fmt.Errorf("google sheets: spreadsheet id kosong")
+	}
+	if strings.Contains(v, "/") {
+		i := strings.Index(v, "/d/")
+		if i < 0 {
+			return "", fmt.Errorf("google sheets: url spreadsheet tidak dikenali: %q", v)
+		}
+		v = v[i+3:]
+		if j := strings.IndexAny(v, "/?#&"); j >= 0 {
+			v = v[:j]
+		}
+	}
+	if strings.ContainsAny(v, " \t") {
+		return "", fmt.Errorf("google sheets: id spreadsheet tidak valid: %q", v)
+	}
+	if len(v) < 20 {
+		return "", fmt.Errorf("google sheets: id spreadsheet terlalu pendek: %q", v)
+	}
+	return v, nil
+}
+
+// checkKeyFilePerm rejects a credentials file that anyone but the owner can
+// read.
+//
+// The service-account private key grants full read/write access to every
+// spreadsheet shared with the account, so the file must stay owner-only. A
+// group- or world-readable key is rejected outright rather than warned about,
+// because the deployment environment is the only place the file exists.
+func checkKeyFilePerm(keyFile string) error {
+	info, err := os.Stat(keyFile)
+	if err != nil {
+		return fmt.Errorf("google sheets: stat kunci: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("google sheets: kunci bukan file biasa: %s", keyFile)
+	}
+	if perm := info.Mode().Perm(); perm&0o077 != 0 {
+		return fmt.Errorf("google sheets: izin kunci %s terlalu terbuka (%#o); jalankan: chmod 600 %s",
+			keyFile, perm, keyFile)
 	}
 	return nil
 }
@@ -276,8 +586,11 @@ func (s *Store) readSheet(ctx context.Context, sheet string) ([]sheetEntry, erro
 	if err != nil {
 		return nil, err
 	}
-	u := fmt.Sprintf("%s/%s/values/%s!A1:Z",
-		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet))
+	// The range covers the whole grid of the tab, so a tab that is wider or
+	// narrower than the default 26 columns is read completely.
+	last := colLetter(s.tabColumns(ctx, sheet))
+	u := fmt.Sprintf("%s/%s/values/%s!A1:%s",
+		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), last)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -355,9 +668,9 @@ func (s *Store) updateRow(ctx context.Context, sheet string, row int, values []s
 	if err != nil {
 		return err
 	}
-	end := len(values)
-	u := fmt.Sprintf("%s/%s/values/%s!A%d:Z%d",
-		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), row, row)
+	last := colLetter(s.tabColumns(ctx, sheet))
+	u := fmt.Sprintf("%s/%s/values/%s!A%d:%s%d",
+		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), row, last, row)
 	b, err := json.Marshal(map[string]any{"values": [][]string{values}})
 	if err != nil {
 		return err
@@ -377,7 +690,6 @@ func (s *Store) updateRow(ctx context.Context, sheet string, row int, values []s
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("google sheets: update %s: %d: %s", sheet, resp.StatusCode, string(body))
 	}
-	_ = end
 	return nil
 }
 
@@ -387,8 +699,9 @@ func (s *Store) deleteRow(ctx context.Context, sheet string, row int) error {
 	if err != nil {
 		return err
 	}
-	u := fmt.Sprintf("%s/%s/values/%s!A%d:Z%d:clear",
-		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), row, row)
+	last := colLetter(s.tabColumns(ctx, sheet))
+	u := fmt.Sprintf("%s/%s/values/%s!A%d:%s%d:clear",
+		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), row, last, row)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader("{}"))
 	if err != nil {
 		return err
@@ -473,7 +786,7 @@ func valuesToAktivitas(row sheetRow) model.Aktivitas {
 
 func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 	ctx := context.Background()
-	rows, err := s.readSheet(ctx, SheetRekrutmen)
+	rows, err := s.readSheet(ctx, s.tabRekrutmen)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -523,7 +836,7 @@ func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 }
 
 func (s *Store) GetRekrutmen(id string) (*model.Rekrutmen, error) {
-	rows, err := s.readSheet(context.Background(), SheetRekrutmen)
+	rows, err := s.readSheet(context.Background(), s.tabRekrutmen)
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +850,7 @@ func (s *Store) GetRekrutmen(id string) (*model.Rekrutmen, error) {
 }
 
 func (s *Store) FindRekrutmenByWA(noWA string) (*model.Rekrutmen, error) {
-	rows, err := s.readSheet(context.Background(), SheetRekrutmen)
+	rows, err := s.readSheet(context.Background(), s.tabRekrutmen)
 	if err != nil {
 		return nil, err
 	}
@@ -558,12 +871,12 @@ func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
 		return err
 	}
 	r.Metode = model.NormalizeMetode(r.Metode)
-	return s.appendRow(ctx, SheetRekrutmen, rekrutmenToValues(*r))
+	return s.appendRow(ctx, s.tabRekrutmen, rekrutmenToValues(*r))
 }
 
 func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 	ctx := context.Background()
-	rows, err := s.readSheet(ctx, SheetRekrutmen)
+	rows, err := s.readSheet(ctx, s.tabRekrutmen)
 	if err != nil {
 		return err
 	}
@@ -575,7 +888,7 @@ func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 	for _, e := range rows {
 		if e.row["id"] == r.ID {
 			r.Metode = model.NormalizeMetode(r.Metode)
-			return s.updateRow(ctx, SheetRekrutmen, e.num, rekrutmenToValues(*r))
+			return s.updateRow(ctx, s.tabRekrutmen, e.num, rekrutmenToValues(*r))
 		}
 	}
 	return store.ErrNotFound
@@ -583,20 +896,20 @@ func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 
 func (s *Store) DeleteRekrutmen(id string) error {
 	ctx := context.Background()
-	rows, err := s.readSheet(ctx, SheetRekrutmen)
+	rows, err := s.readSheet(ctx, s.tabRekrutmen)
 	if err != nil {
 		return err
 	}
 	for _, e := range rows {
 		if e.row["id"] == id {
-			return s.deleteRow(ctx, SheetRekrutmen, e.num)
+			return s.deleteRow(ctx, s.tabRekrutmen, e.num)
 		}
 	}
 	return store.ErrNotFound
 }
 
 func (s *Store) ListAktivitas() ([]model.Aktivitas, error) {
-	rows, err := s.readSheet(context.Background(), SheetAktivitas)
+	rows, err := s.readSheet(context.Background(), s.tabAktivitas)
 	if err != nil {
 		return nil, err
 	}
@@ -618,12 +931,12 @@ func (s *Store) CreateAktivitas(a *model.Aktivitas) error {
 			return store.ErrDuplicateName
 		}
 	}
-	return s.appendRow(ctx, SheetAktivitas, aktivitasToValues(*a))
+	return s.appendRow(ctx, s.tabAktivitas, aktivitasToValues(*a))
 }
 
 func (s *Store) UpdateAktivitas(a *model.Aktivitas) error {
 	ctx := context.Background()
-	rows, err := s.readSheet(ctx, SheetAktivitas)
+	rows, err := s.readSheet(ctx, s.tabAktivitas)
 	if err != nil {
 		return err
 	}
@@ -636,7 +949,7 @@ func (s *Store) UpdateAktivitas(a *model.Aktivitas) error {
 	for _, e := range rows {
 		if e.row["id"] == a.ID {
 			oldName = e.row["nama"]
-			if err := s.updateRow(ctx, SheetAktivitas, e.num, aktivitasToValues(*a)); err != nil {
+			if err := s.updateRow(ctx, s.tabAktivitas, e.num, aktivitasToValues(*a)); err != nil {
 				return err
 			}
 			if oldName != a.Nama {
@@ -650,7 +963,7 @@ func (s *Store) UpdateAktivitas(a *model.Aktivitas) error {
 
 // renameAktivitas rewrites the aktivitas column for every record using oldName.
 func (s *Store) renameAktivitas(ctx context.Context, oldName, newName string) error {
-	rows, err := s.readSheet(ctx, SheetRekrutmen)
+	rows, err := s.readSheet(ctx, s.tabRekrutmen)
 	if err != nil {
 		return err
 	}
@@ -660,7 +973,7 @@ func (s *Store) renameAktivitas(ctx context.Context, oldName, newName string) er
 		}
 		r := valuesToRekrutmen(e.row)
 		r.Aktivitas = newName
-		if err := s.updateRow(ctx, SheetRekrutmen, e.num, rekrutmenToValues(r)); err != nil {
+		if err := s.updateRow(ctx, s.tabRekrutmen, e.num, rekrutmenToValues(r)); err != nil {
 			return err
 		}
 	}
@@ -669,7 +982,7 @@ func (s *Store) renameAktivitas(ctx context.Context, oldName, newName string) er
 
 func (s *Store) DeleteAktivitas(id string) error {
 	ctx := context.Background()
-	rows, err := s.readSheet(ctx, SheetAktivitas)
+	rows, err := s.readSheet(ctx, s.tabAktivitas)
 	if err != nil {
 		return err
 	}
@@ -683,7 +996,7 @@ func (s *Store) DeleteAktivitas(id string) error {
 	if name == "" {
 		return store.ErrNotFound
 	}
-	reks, err := s.readSheet(ctx, SheetRekrutmen)
+	reks, err := s.readSheet(ctx, s.tabRekrutmen)
 	if err != nil {
 		return err
 	}
@@ -694,7 +1007,7 @@ func (s *Store) DeleteAktivitas(id string) error {
 	}
 	for _, e := range rows {
 		if e.row["id"] == id {
-			return s.deleteRow(ctx, SheetAktivitas, e.num)
+			return s.deleteRow(ctx, s.tabAktivitas, e.num)
 		}
 	}
 	return store.ErrNotFound

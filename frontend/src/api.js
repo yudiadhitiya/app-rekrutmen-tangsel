@@ -87,6 +87,11 @@ export const api = {
   logout: () => request('/logout', { method: 'POST' }),
   me: () => request('/me'),
 
+  register: {
+    options: () => request('/register/options'),
+    submit: (body) => request('/register', { method: 'POST', body })
+  },
+
   wilayah: () => request('/wilayah'),
 
   aktivitas: {

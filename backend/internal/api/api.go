@@ -34,6 +34,24 @@ type Config struct {
 	SupabaseAPIKey string
 	GoogleSheetID  string
 	GoogleKeyFile  string
+
+	// Google Sheets layout. Empty values fall back to the store defaults.
+	GoogleSheetsMode         string
+	GoogleSheetsTabRekrutmen string
+	GoogleSheetsTabAktivitas string
+	GoogleSheetsTabSumber    string
+	GoogleSheetsTabPengguna  string
+
+	// LegacyAuthMode says how accounts of the previous application are
+	// handled:
+	//
+	//	"upgrade" - the first sign in with the old credentials stores the
+	//	            account locally with a salted hash; later sign ins use it
+	//	"sheet"   - every sign in is verified against the sheet
+	//	"off"     - the old accounts are not used
+	//
+	// An empty value means "upgrade".
+	LegacyAuthMode string
 }
 
 // Server holds the HTTP handlers and the active storage provider.
@@ -45,6 +63,9 @@ type Server struct {
 	mu    sync.RWMutex
 	store store.Store
 
+	// registerLimiter counts the self-registration attempts per address.
+	registerLimiter *registerLimiter
+
 	// storeFactory builds a provider on demand, so an admin can switch
 	// providers without restarting the process.
 	storeFactory func(provider string) (store.Store, error)
@@ -53,9 +74,10 @@ type Server struct {
 // New builds a Server and selects the configured provider.
 func New(cfg Config, authMgr *auth.Manager, setStore *settings.Store) (*Server, error) {
 	s := &Server{
-		cfg:      cfg,
-		auth:     authMgr,
-		settings: setStore,
+		cfg:             cfg,
+		auth:            authMgr,
+		settings:        setStore,
+		registerLimiter: newRegisterLimiter(),
 		storeFactory: func(provider string) (store.Store, error) {
 			switch provider {
 			case settings.ProviderLocal:
@@ -69,7 +91,14 @@ func New(cfg Config, authMgr *auth.Manager, setStore *settings.Store) (*Server, 
 				if cfg.GoogleSheetID == "" || cfg.GoogleKeyFile == "" {
 					return nil, errors.New("google sheets: GOOGLE_SHEET_ID dan GOOGLE_KEY_FILE belum diatur")
 				}
-				return sheets.New(cfg.GoogleSheetID, cfg.GoogleKeyFile)
+				return sheets.New(sheets.Config{
+					SpreadsheetID: cfg.GoogleSheetID,
+					KeyFile:       cfg.GoogleKeyFile,
+					TabRekrutmen:  cfg.GoogleSheetsTabRekrutmen,
+					TabAktivitas:  cfg.GoogleSheetsTabAktivitas,
+					TabSumber:     cfg.GoogleSheetsTabSumber,
+					Mode:          cfg.GoogleSheetsMode,
+				})
 			default:
 				return nil, errors.New("provider tidak dikenal: " + provider)
 			}
@@ -198,6 +227,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/logout", s.handleLogout)
 	mux.HandleFunc("GET /api/me", s.requireAuth(s.handleMe))
 
+	// Self-registration of members.
+	mux.HandleFunc("GET /api/register/options", s.handleRegisterOptions)
+	mux.HandleFunc("POST /api/register", s.handleRegister)
+
 	// Master wilayah.
 	mux.HandleFunc("GET /api/wilayah", s.requireAuth(s.handleWilayah))
 
@@ -257,16 +290,34 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "body tidak valid")
 		return
 	}
-	user, err := s.auth.VerifyPassword(body.Username, body.Password)
+	user, fromLegacy, err := s.auth.VerifyLogin(body.Username, body.Password)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "username atau password salah")
+		if errors.Is(err, auth.ErrInvalidCredentials) {
+			writeError(w, http.StatusUnauthorized, "username atau password salah")
+			return
+		}
+		// The account store could not be reached; that is not the user's
+		// fault, so it is not reported as a wrong password.
+		writeError(w, http.StatusInternalServerError, "gagal memverifikasi akun: "+err.Error())
 		return
 	}
+
+	// The account came from the previous application. Store it locally, so
+	// the next sign in uses the salted hash of this application.
+	migrated := false
+	if fromLegacy && s.cfg.LegacyAuthMode != "sheet" {
+		if err := s.auth.MigrateLegacyUser(user, body.Password); err != nil {
+			log.Printf("gagal memindahkan akun %s: %v", user.Username, err)
+		} else {
+			migrated = true
+		}
+	}
+
 	if err := s.auth.SetSession(w, user); err != nil {
 		writeError(w, http.StatusInternalServerError, "gagal membuat sesi")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": user})
+	writeJSON(w, http.StatusOK, map[string]any{"user": user, "migrated": migrated})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -576,6 +627,7 @@ func (s *Server) handleDeleteRekrutmen(w http.ResponseWriter, r *http.Request, u
 // Settings
 // ---------------------------------------------------------------------------
 
+// handleGetSettings reports the runtime configuration to an admin.
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request, user model.User) {
 	cur := s.settings.Get()
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -584,7 +636,29 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request, user 
 		"active_provider":  s.Store().Name(),
 		"supabase_ready":   s.cfg.SupabaseURL != "" && s.cfg.SupabaseAPIKey != "",
 		"google_sheets_ok": s.cfg.GoogleSheetID != "" && s.cfg.GoogleKeyFile != "",
+		"google_sheets": map[string]any{
+			"mode":      sheetsMode(s.cfg.GoogleSheetsMode),
+			"rekrutmen": sheetsTab(s.cfg.GoogleSheetsTabRekrutmen, sheets.DefaultTabRekrutmen),
+			"aktivitas": sheetsTab(s.cfg.GoogleSheetsTabAktivitas, sheets.DefaultTabAktivitas),
+			"sumber":    s.cfg.GoogleSheetsTabSumber,
+		},
 	})
+}
+
+// sheetsMode returns the configured Sheets mode, defaulting to app.
+func sheetsMode(mode string) string {
+	if mode == "" {
+		return sheets.ModeApp
+	}
+	return mode
+}
+
+// sheetsTab returns the configured tab name, defaulting to the given value.
+func sheetsTab(name, fallback string) string {
+	if name == "" {
+		return fallback
+	}
+	return name
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request, user model.User) {

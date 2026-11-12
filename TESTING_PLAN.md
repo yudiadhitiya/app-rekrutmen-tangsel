@@ -228,6 +228,23 @@ dipulihkan.
 | T-68 | **Audit a11y** | ⬜ | axe-core di E2E |
 | T-69 | **Integration test Supabase sungguhan** | ⬜ | skip kalau `SUPABASE_URL` kosong |
 | T-70 | **Integration test Sheets sungguhan** | ⬜ | skip kalau `GOOGLE_SHEET_ID` kosong |
+| T-81 | **Resolusi mapping kolom Sheets** | ✅ | `TestResolveColumnMapMatchesAliases`, `...IgnoresPunctuation`, `...UsesAliasWhenNeeded`, `...PrefersFirstMatch`, `...ReportsMissingRequiredColumn` |
+| T-82 | **Konversi nilai baris Sheets** | ✅ | `TestColumnMapRecord`, `TestParseTimestampFormats`, `TestNormalizeNoWA` |
+| T-83 | **ID turunan stabil (idempoten)** | ✅ | `TestDerivedIDIsStable` |
+| T-84 | **Perencanaan impor respons form** | ✅ | `TestBuildPlanImportsValidRow`, `...SkipsDuplicateNumbers`, `...MarksInvalidRowForReview`, `...SkipsRowWithoutNumber`, `...ReportsNewActivity`, `...IsIdempotent` |
+| T-85 | **Mode `form` tidak pernah membuat tab** | ✅ | `TestSheetsFormModeNeverCreatesTabs` |
+| T-86 | **Konfigurasi tab dan id spreadsheet** | ✅ | `TestSheetsUsesConfiguredTabNames`, `TestSheetsAcceptsSpreadsheetURL`, `TestSheetsRejectsInvalidSpreadsheetID` |
+| T-87 | **File kredensial dengan izin longgar ditolak** | ✅ | `TestSheetsRejectsReadableKeyFile` |
+| T-88 | **Login memakai akun aplikasi lama** | ✅ | `TestSheetsVerifyLegacyUser`, `...IsCaseInsensitive`, `...RejectsBadCredentials`, `...MapsRoles`, `...ReportsMissingTab` |
+| T-89 | **Pemetaan peran aplikasi lama** | ✅ | `TestLegacyRoleMapping` |
+| T-90 | **Login lokal didahulukan atas akun lama** | ✅ | `TestVerifyLoginUsesLocalAccount` |
+| T-91 | **Login lama dipindahkan ke akun lokal** | ✅ | `TestMigrateLegacyUserStoresAccountLocally`, `...KeepsExistingAccount` |
+| T-92 | **Endpoint login menerima akun lama** | ✅ | `TestLoginWithLegacyAccount`, `TestLoginWithWrongLegacyPassword` |
+| T-93 | **Integrasi login ke spreadsheet sungguhan** | ⬜ | `TestLegacyLoginIntegration`, skip tanpa `GOOGLE_LEGACY_TEST_USER` |
+| T-94 | **Format hash akun lama di spreadsheet sungguhan** | ✅ | `TestLegacyHashFormat` — 153/153 hash berupa sha256 hex |
+| T-95 | **Pendaftaran mandiri menulis baris sesuai layout aplikasi lama** | ✅ | `TestRegisterUserAppendsRowWithLegacyLayout`, `...HashesPasswordWithSHA256`, `...NormalizesSecurityAnswers`, `...RejectsTakenUsername`, `TestRegisteredUserCanSignIn` |
+| T-96 | **Validasi & endpoint pendaftaran mandiri** | ✅ | `TestRegisterCreatesAnAccount`, `TestRegisterRejectsInvalidInput`, `TestRegisterReportsTakenUsername`, `TestRegisterWithoutAccountStoreIsUnavailable`, `TestRegisterOptionsArePublic` |
+| T-97 | **Uji langsung pendaftaran ke spreadsheet sungguhan** | ✅ | manual: daftar → baris muncul di tab `USERS` → login berhasil → baris uji dihapus |
 | T-71 | **Test keamanan cookie `Secure`** | ⬜ | terkait D-82 |
 | T-72 | **Test rate limit login** | ⬜ | terkait D-83 |
 | T-73 | **Test batas atas `limit`** | ⬜ | terkait D-88 |

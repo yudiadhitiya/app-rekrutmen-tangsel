@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,12 +40,15 @@ func testPrivateKeyPEM(t *testing.T) string {
 type fakeSheets struct {
 	mu   sync.Mutex
 	grid map[string][][]string
+	// tabs lists the tabs that exist in the spreadsheet, with their column
+	// count. It is what the spreadsheet metadata endpoint reports.
+	tabs map[string]int
 	// tokenCalls counts OAuth token requests.
 	tokenCalls int
 }
 
 func newFakeSheets() *fakeSheets {
-	return &fakeSheets{grid: map[string][][]string{}}
+	return &fakeSheets{grid: map[string][][]string{}, tabs: map[string]int{}}
 }
 
 func (f *fakeSheets) tab(name string) [][]string {
@@ -68,15 +72,83 @@ func (f *fakeSheets) serve(t *testing.T) *httptest.Server {
 			return
 		}
 
-		// Sheet endpoints look like /x/values/<Tab>... ; the spreadsheet id is
-		// the first path segment.
-		rest, ok := strings.CutPrefix(path, "/x/values/")
+		// The spreadsheet id is the first path segment; the remainder
+		// identifies the endpoint: the spreadsheet itself, a batch update, or
+		// one of the values endpoints.
+		rest, ok := splitPath(path)
 		if !ok {
-			if path == "/x" && r.Method == http.MethodPost {
-				// Add a sheet.
-				fmt.Fprint(w, `{}`)
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, `{"error":"not found: `+path+`"}`)
+			return
+		}
+
+		switch {
+		case rest == "":
+			// Spreadsheet metadata.
+			if r.Method != http.MethodGet {
+				w.WriteHeader(http.StatusNotFound)
+				fmt.Fprint(w, `{"error":"not found: `+path+`"}`)
 				return
 			}
+			f.mu.Lock()
+			titles := make([]string, 0, len(f.tabs))
+			for title := range f.tabs {
+				titles = append(titles, title)
+			}
+			sort.Strings(titles)
+			sheets := make([]map[string]any, 0, len(titles))
+			for _, title := range titles {
+				sheets = append(sheets, map[string]any{
+					"properties": map[string]any{
+						"title": title,
+						"gridProperties": map[string]any{
+							"rowCount":    1000,
+							"columnCount": f.tabs[title],
+						},
+					},
+				})
+			}
+			f.mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"sheets": sheets})
+			return
+
+		case strings.HasSuffix(rest, ":batchUpdate"):
+			// Batch update: adds a sheet.
+			if r.Method != http.MethodPost {
+				w.WriteHeader(http.StatusNotFound)
+				fmt.Fprint(w, `{"error":"not found: `+path+`"}`)
+				return
+			}
+			var body struct {
+				Requests []struct {
+					AddSheet struct {
+						Properties struct {
+							Title string `json:"title"`
+						} `json:"properties"`
+					} `json:"addSheet"`
+				} `json:"requests"`
+			}
+			json.NewDecoder(r.Body).Decode(&body)
+			f.mu.Lock()
+			for _, req := range body.Requests {
+				title := req.AddSheet.Properties.Title
+				if title == "" {
+					continue
+				}
+				f.tabs[title] = 26
+				if _, ok := f.grid[title]; !ok {
+					f.grid[title] = nil
+				}
+			}
+			f.mu.Unlock()
+			fmt.Fprint(w, `{}`)
+			return
+
+		case strings.HasPrefix(rest, "values/"):
+			rest = strings.TrimPrefix(rest, "values/")
+
+		default:
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprint(w, `{"error":"not found: `+path+`"}`)
 			return
@@ -152,6 +224,25 @@ func (f *fakeSheets) serve(t *testing.T) *httptest.Server {
 	}))
 }
 
+// splitPath strips the spreadsheet id segment from an API path and returns
+// the remainder. An empty remainder means the spreadsheet itself was
+// addressed.
+func splitPath(path string) (string, bool) {
+	trimmed := strings.TrimPrefix(path, "/")
+	if trimmed == "" {
+		return "", false
+	}
+	i := strings.Index(trimmed, "/")
+	if i < 0 {
+		// The spreadsheet itself, possibly with a :batchUpdate suffix.
+		if strings.HasSuffix(trimmed, ":batchUpdate") {
+			return ":batchUpdate", true
+		}
+		return "", true
+	}
+	return trimmed[i+1:], true
+}
+
 // rowFromSpec extracts the 1-based row number from a range like "Rekrutmen!A5:Z5".
 func rowFromSpec(spec string) int {
 	start := strings.Index(spec, "!A") + 2
@@ -160,31 +251,74 @@ func rowFromSpec(spec string) int {
 	return num
 }
 
+// testSpreadsheetID is a stand-in for a real spreadsheet id. Its length
+// matters only because the store rejects obviously wrong ids.
+const testSpreadsheetID = "test-spreadsheet-id-000000000000000000000000"
+
 // newTestStore builds a Store pointed at the fake API.
 func newTestStore(t *testing.T) (*Store, *fakeSheets) {
+	t.Helper()
+	return newTestStoreWith(t, Config{})
+}
+
+// newTestStoreWith builds a Store with the given configuration, pointed at
+// the fake API. Empty configuration fields fall back to the defaults.
+func newTestStoreWith(t *testing.T, cfg Config) (*Store, *fakeSheets) {
 	t.Helper()
 	fake := newFakeSheets()
 	srv := fake.serve(t)
 	t.Cleanup(srv.Close)
 
-	keyFile := filepath.Join(t.TempDir(), "key.json")
-	key := map[string]string{
-		"client_email": "svc@example.iam.gserviceaccount.com",
-		"private_key":  testPrivateKeyPEM(t),
-		"token_uri":    srv.URL + "/token",
+	if cfg.SpreadsheetID == "" {
+		cfg.SpreadsheetID = testSpreadsheetID
 	}
-	b, _ := json.Marshal(key)
-	if err := os.WriteFile(keyFile, b, 0o600); err != nil {
-		t.Fatal(err)
+	if cfg.KeyFile == "" {
+		keyFile := filepath.Join(t.TempDir(), "key.json")
+		key := map[string]string{
+			"client_email": "svc@example.iam.gserviceaccount.com",
+			"private_key":  testPrivateKeyPEM(t),
+			"token_uri":    srv.URL + "/token",
+		}
+		b, _ := json.Marshal(key)
+		if err := os.WriteFile(keyFile, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cfg.KeyFile = keyFile
 	}
 
-	s, err := New("x", keyFile)
+	s, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Point the API base URLs at the fake server.
 	s.baseURL = srv.URL
 	return s, fake
+}
+
+func TestSheetsRejectsReadableKeyFile(t *testing.T) {
+	dir := t.TempDir()
+	keyFile := filepath.Join(dir, "key.json")
+	body := []byte(`{"client_email":"svc@example.iam.gserviceaccount.com","private_key":"x"}`)
+	if err := os.WriteFile(keyFile, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Explicit chmod so the test does not depend on the umask.
+	if err := os.Chmod(keyFile, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(Config{SpreadsheetID: testSpreadsheetID, KeyFile: keyFile}); err == nil {
+		t.Fatal("expected New to reject a world-readable credentials file")
+	} else if !strings.Contains(err.Error(), "terlalu terbuka") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The same file with owner-only permissions is accepted.
+	if err := os.Chmod(keyFile, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(Config{SpreadsheetID: testSpreadsheetID, KeyFile: keyFile}); err != nil {
+		t.Fatalf("expected New to accept a 0600 credentials file: %v", err)
+	}
 }
 
 func TestSheetsEnsureTabsCreatesHeaders(t *testing.T) {
@@ -412,5 +546,79 @@ func TestSheetsAktivitasMaster(t *testing.T) {
 	// An activity in use cannot be deleted.
 	if err := s.DeleteAktivitas("a1"); err != store.ErrAktivitasUsed {
 		t.Errorf("expected ErrAktivitasUsed, got %v", err)
+	}
+}
+
+func TestSheetsFormModeNeverCreatesTabs(t *testing.T) {
+	s, fake := newTestStoreWith(t, Config{Mode: ModeForm, TabSumber: "Form Responses 1"})
+
+	// The source tab does not exist yet, so Ping must fail with a message
+	// that names the missing tab.
+	err := s.Ping()
+	if err == nil {
+		t.Fatal("expected Ping to fail when the source tab is missing")
+	}
+	if !strings.Contains(err.Error(), "Form Responses 1") {
+		t.Fatalf("expected the error to name the missing tab, got: %v", err)
+	}
+
+	// Create the tab in the fake and check again.
+	fake.mu.Lock()
+	fake.tabs["Form Responses 1"] = 14
+	fake.mu.Unlock()
+	s.invalidateTabs()
+	if err := s.Ping(); err != nil {
+		t.Fatalf("Ping: %v", err)
+	}
+
+	// Form mode must not have created the tabs the application would own.
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	for _, title := range []string{"Rekrutmen", "Aktivitas"} {
+		if _, ok := fake.tabs[title]; ok {
+			t.Errorf("form mode must not create the %q tab", title)
+		}
+	}
+}
+
+func TestSheetsUsesConfiguredTabNames(t *testing.T) {
+	s, fake := newTestStoreWith(t, Config{
+		TabRekrutmen: "Data Rekrutmen",
+		TabAktivitas: "Master Aktivitas",
+	})
+	if err := s.Ping(); err != nil {
+		t.Fatalf("Ping: %v", err)
+	}
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	for _, title := range []string{"Data Rekrutmen", "Master Aktivitas"} {
+		if _, ok := fake.tabs[title]; !ok {
+			t.Errorf("expected the %q tab to be created", title)
+		}
+	}
+	if _, ok := fake.tabs["Rekrutmen"]; ok {
+		t.Error("the default tab name must not be used when another one is configured")
+	}
+}
+
+func TestSheetsAcceptsSpreadsheetURL(t *testing.T) {
+	s, _ := newTestStoreWith(t, Config{
+		SpreadsheetID: "https://docs.google.com/spreadsheets/d/" + testSpreadsheetID + "/edit#gid=0",
+	})
+	if s.spreadsheetID != testSpreadsheetID {
+		t.Fatalf("expected the id to be extracted from the URL, got %q", s.spreadsheetID)
+	}
+}
+
+func TestSheetsRejectsInvalidSpreadsheetID(t *testing.T) {
+	dir := t.TempDir()
+	keyFile := filepath.Join(dir, "key.json")
+	if err := os.WriteFile(keyFile, []byte(`{"client_email":"a@b","private_key":"x"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"", "pendek", "https://docs.google.com/spreadsheets/abc"} {
+		if _, err := New(Config{SpreadsheetID: id, KeyFile: keyFile}); err == nil {
+			t.Errorf("expected the spreadsheet id %q to be rejected", id)
+		}
 	}
 }
