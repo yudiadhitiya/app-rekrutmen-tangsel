@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"rekrutmen-tangsel/backend/internal/auth"
 	"rekrutmen-tangsel/backend/internal/model"
 )
 
@@ -32,6 +33,64 @@ func (e *testEnv) listRekrutmen() ([]model.Rekrutmen, int) {
 		e.t.Fatalf("list: expected 200, got %d", code)
 	}
 	return out.Data, out.Total
+}
+
+func TestAdminKecamatanOnlySeesOwnDistrict(t *testing.T) {
+	e := newTestEnvWithUsers(t, []auth.User{
+		newTestUser(t, "kec", "kec12345", model.LevelAdminKecamatan, "Serpong"),
+	})
+
+	// The full administrator creates a record of every district.
+	e.loginAs("admin", "admin123")
+	for i, kec := range []string{"Serpong", "Ciputat"} {
+		body := validBody()
+		body["kecamatan"] = kec
+		body["kelurahan"] = "Buaran"
+		if kec == "Ciputat" {
+			body["kelurahan"] = "Cipayung"
+		}
+		body["no_wa"] = "62812345678" + string(rune('0'+i))
+		if code := e.request(http.MethodPost, "/api/rekrutmen", body, nil); code != http.StatusCreated {
+			t.Fatalf("create %s: expected 201, got %d", kec, code)
+		}
+	}
+
+	// The district administrator only reaches its own district.
+	e.loginAs("kec", "kec12345")
+	rows, total := e.listRekrutmen()
+	if total != 1 || len(rows) != 1 {
+		t.Fatalf("admin kecamatan list: expected 1 record, got %d (total %d)", len(rows), total)
+	}
+	if rows[0].Kecamatan != "Serpong" {
+		t.Errorf("admin kecamatan list: expected district Serpong, got %q", rows[0].Kecamatan)
+	}
+
+	// The full administrator still reaches every district.
+	e.loginAs("admin", "admin123")
+	rows, total = e.listRekrutmen()
+	if total != 2 || len(rows) != 2 {
+		t.Fatalf("admin list: expected 2 records, got %d (total %d)", len(rows), total)
+	}
+}
+
+func TestAdminKecamatanCannotOpenAnotherDistrictRecord(t *testing.T) {
+	e := newTestEnvWithUsers(t, []auth.User{
+		newTestUser(t, "kec", "kec12345", model.LevelAdminKecamatan, "Serpong"),
+	})
+
+	e.loginAs("admin", "admin123")
+	body := validBody()
+	body["kecamatan"] = "Ciputat"
+	body["kelurahan"] = "Cipayung"
+	var rec model.Rekrutmen
+	if code := e.request(http.MethodPost, "/api/rekrutmen", body, &rec); code != http.StatusCreated {
+		t.Fatalf("create: expected 201, got %d", code)
+	}
+
+	e.loginAs("kec", "kec12345")
+	if code := e.request(http.MethodGet, "/api/rekrutmen/"+rec.ID, nil, nil); code != http.StatusNotFound {
+		t.Fatalf("get other district record: expected 404, got %d", code)
+	}
 }
 
 func TestPetugasOnlySeesOwnRecords(t *testing.T) {

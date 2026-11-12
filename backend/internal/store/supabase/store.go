@@ -123,10 +123,18 @@ func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 		// Case-insensitive match on name or WhatsApp number.
 		q.Set("or", fmt.Sprintf("(nama.ilike.*%s*,no_wa.ilike.*%s*)", s, s))
 	}
-	if f.CreatedBy != "" {
-		q.Set("created_by", "eq."+f.CreatedBy)
+	if f.Scope.CreatedBy != "" {
+		q.Set("created_by", "eq."+f.Scope.CreatedBy)
 	}
-	if f.Kecamatan != "" {
+	// The scope of the account and the district filter of the request both
+	// narrow the district. A request for another district than the account
+	// may reach yields no record at all.
+	switch {
+	case f.Scope.Kecamatan != "" && f.Kecamatan != "" && !strings.EqualFold(f.Scope.Kecamatan, f.Kecamatan):
+		return []model.Rekrutmen{}, 0, nil
+	case f.Scope.Kecamatan != "":
+		q.Set("kecamatan", "eq."+f.Scope.Kecamatan)
+	case f.Kecamatan != "":
 		q.Set("kecamatan", "eq."+f.Kecamatan)
 	}
 	if f.Kelurahan != "" {

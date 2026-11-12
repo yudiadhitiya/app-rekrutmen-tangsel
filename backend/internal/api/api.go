@@ -463,11 +463,10 @@ func (s *Server) handleListRekrutmen(w http.ResponseWriter, r *http.Request, use
 		Page:      page,
 		Limit:     limit,
 	}
-	// An admin reaches every record. An ordinary officer only reaches the
-	// records they created themselves.
-	if user.Role != model.RoleAdmin {
-		f.CreatedBy = user.Username
-	}
+	// The scope of the account decides which records are reachable. It is
+	// part of the filter, so it is applied before the rows are paginated and
+	// the reported total stays correct.
+	f.Scope = user.ScopeFor()
 	data, total, err := s.Store().ListRekrutmen(f)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
@@ -500,7 +499,7 @@ func (s *Server) handleGetRekrutmen(w http.ResponseWriter, r *http.Request, user
 		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
 		return
 	}
-	if !canAccess(user, rec.CreatedBy) {
+	if !canAccess(user, *rec) {
 		writeError(w, http.StatusNotFound, "data tidak ditemukan")
 		return
 	}
@@ -509,14 +508,12 @@ func (s *Server) handleGetRekrutmen(w http.ResponseWriter, r *http.Request, user
 
 // canAccess reports whether a user may read or change a record.
 //
-// An admin reaches every record. An ordinary officer only reaches the records
-// they created themselves, which is the rule the previous application applied
-// to its members. A record without an owner stays with the admins.
-func canAccess(user model.User, createdBy string) bool {
-	if user.Role == model.RoleAdmin {
-		return true
-	}
-	return createdBy != "" && createdBy == user.Username
+// The scope of the account decides, not the plain role: a full administrator
+// reaches every record, a district administrator only the records of its own
+// district, and a member only the records it created itself. A record without
+// an owner stays with the administrators.
+func canAccess(user model.User, rec model.Rekrutmen) bool {
+	return model.MatchScope(user.ScopeFor(), rec)
 }
 
 // handleCheckWA reports whether a WhatsApp number is already registered, so the
@@ -534,6 +531,13 @@ func (s *Server) handleCheckWA(w http.ResponseWriter, r *http.Request, user mode
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "gagal memeriksa nomor: "+err.Error())
+		return
+	}
+	// A record outside the scope of the account is reported as existing
+	// without its details, so a duplicate number is still refused while the
+	// other district stays hidden.
+	if !canAccess(user, *rec) {
+		writeJSON(w, http.StatusOK, map[string]any{"exists": true})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"exists": true, "id": rec.ID, "nama": rec.Nama})
@@ -613,7 +617,7 @@ func (s *Server) handleUpdateRekrutmen(w http.ResponseWriter, r *http.Request, u
 		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
 		return
 	}
-	if !canAccess(user, prev.CreatedBy) {
+	if !canAccess(user, *prev) {
 		writeError(w, http.StatusNotFound, "data tidak ditemukan")
 		return
 	}
@@ -636,7 +640,21 @@ func (s *Server) handleUpdateRekrutmen(w http.ResponseWriter, r *http.Request, u
 }
 
 func (s *Server) handleDeleteRekrutmen(w http.ResponseWriter, r *http.Request, user model.User) {
-	if err := s.Store().DeleteRekrutmen(r.PathValue("id")); err != nil {
+	rec, err := s.Store().GetRekrutmen(r.PathValue("id"))
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "data tidak ditemukan")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
+		return
+	}
+	// A record outside the scope of the account does not exist for it.
+	if !canAccess(user, *rec) {
+		writeError(w, http.StatusNotFound, "data tidak ditemukan")
+		return
+	}
+	if err := s.Store().DeleteRekrutmen(rec.ID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "data tidak ditemukan")
 			return

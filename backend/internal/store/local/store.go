@@ -106,7 +106,7 @@ func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 			!strings.Contains(r.NoWA, q) {
 			continue
 		}
-		if f.CreatedBy != "" && r.CreatedBy != f.CreatedBy {
+		if !model.MatchScope(f.Scope, r) {
 			continue
 		}
 		if f.Kecamatan != "" && r.Kecamatan != f.Kecamatan {

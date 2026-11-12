@@ -117,9 +117,11 @@ Baris kosong dan baris tanpa `NAMA TARGET` dilewati (`code.gs:364-369`).
 
 ---
 
-## 5. Rekomendasi pemulihan logika lama (belum diimplementasikan)
+## 5. Rekomendasi pemulihan logika lama
 
-### 5.1 Kembalikan granularity role
+Status: **5.1 dan 5.2 sudah diimplementasikan** (lihat bagian 7). 5.3–5.5 masih terbuka.
+
+### 5.1 Kembalikan granularity role ✅
 - `model.User` perlu tambahan: `RoleDetail` (atau `Level`) dan `Kecamatan`.
 - Pemetaan dari role lama (`users.go:47-54`) diperluas:
   | Role lama | Level | Scope data |
@@ -130,13 +132,14 @@ Baris kosong dan baris tanpa `NAMA TARGET` dilewati (`code.gs:364-369`).
   | ANGGOTA | 1 | `created_by` = username miliknya |
 - Level 3 (admin) tetap mendapat akses penuh → keluhan "admin harus lihat semua" satisfied.
 
-### 5.2 Terapkan scope di API, bukan di store
-- Tambahkan parameter scope pada `model.Filter` (mis. `ScopeByUsername`, `ScopeKecamatan`) atau lakukan penyaringan di `api.go:453-487` sebelum memanggil store.
-- Filter role-old diterapkan **sebelum** pagination agar `total` juga benar.
-- Jangan diubah di layer store: `store` tetap agnostik terhadap role.
+### 5.2 Terapkan scope di API, bukan di store ✅
+- Scope ditambahkan pada `model.Filter` (`Filter.Scope`), diisi di layer API dari `model.User.ScopeFor()`.
+- Scope diterapkan **sebelum** pagination (di dalam store) agar `total` juga benar.
+- Store tetap agnostik terhadap role: store hanya Applying field scope generik, tanpa tahu apa itu admin/anggota.
 
 ### 5.3 Jaga hak hapus seperti lama
 - `requireAdmin` saat ini mengizinkan hapus oleh semua admin; versi lama hanya ADMIN PTD/SYSTEM ADMIN (`index.html:893-896`). Pertimbangkan `requireAdmin(level>=3)`.
+- Catatan: hapus kini dibatasi ke dalam scope akun (`canAccess`), tetapi **siapa** yang boleh menghapus masih memakai `role`, bukan `level`.
 
 ### 5.4 Migrasi data historis sekali jalan
 Buat importer yang memetakan header lama → field baru:
@@ -165,14 +168,32 @@ Tambahkan ke `FormColumnSpec`: `nama target`, `nama anggota`, `aktifitas`, `upls
 
 ## 6. Ringkasan akar masalah
 
-| Item | Dampak | Prioritas |
-|--------|--------|-----------|
-| Tidak ada filter role di daftar data | petugas melihat semua data; scoping lama hilang | P1 |
-| Tab data historis (`PENDAFTARAN`) tidak pernah dibaca | data lama tidak muncul sama sekali | P1 |
-| Header warisan tidak cocok dengan kunci reader | data tampil kosong bila tab diarahkan ke `PENDAFTARAN` | P1 |
-| `UPL` terpecah (UPLS/UPLM) | nilai UPL hilang saat impor | P2 |
-| Alias importer tidak mengenal `NAMA TARGET`/`AKTIFITAS` | impor gagal / data kehilangan field | P2 |
-| `created_by` tidak terisi pada data lama | scoping ANGGOTA tidak mungkin ditegakkan | P2 |
-| Role `ADMIN KECAMATAN` dipromosikan menjadi `admin` | privilege escalation vs aplikasi lama | P1 |
+| Item | Dampak | Prioritas | Status |
+|------|--------|-----------|--------|
+| Tidak ada filter role di daftar data | petugas melihat semua data; scoping lama hilang | P1 | ✅ 5.2 |
+| Tab data historis (`PENDAFTARAN`) tidak pernah dibaca | data lama tidak muncul sama sekali | P1 | ⏳ 5.4 |
+| Header warisan tidak cocok dengan kunci reader | data tampil kosong bila tab diarahkan ke `PENDAFTARAN` | P1 | ⏳ 5.4 |
+| `UPL` terpecah (UPLS/UPLM) | nilai UPL hilang saat impor | P2 | ⏳ 5.4 |
+| Alias importer tidak mengenal `NAMA TARGET`/`AKTIFITAS` | impor gagal / data kehilangan field | P2 | ⏳ 5.5 |
+| `created_by` tidak terisi pada data lama | scoping ANGGOTA tidak mungkin ditegakkan | P2 | ⏳ 5.4 |
+| Role `ADMIN KECAMATAN` dipromosikan menjadi `admin` | privilege escalation vs aplikasi lama | P1 | ✅ 5.1 (level 2 + scope kecamatan) |
 
-> Catatan: dokumen ini murni analisis. Perbaikan kode (filter role, importer, alias kolom) dilakukan pada tahap terpisah setelah keputusan scope disepakati.
+> Catatan: dokumen ini started as pure analysis. Perbaikan kode dilakukan bertahap; 5.1 dan 5.2 sudah masuk ke kode, sisanya (5.3–5.5) menunggu.
+
+---
+
+## 7. Implementasi 5.1 dan 5.2
+
+### 5.1 — Granularity role
+- `model.User` gained `Level` (`model.LevelAnggota` = 1, `LevelAdminKecamatan` = 2, `LevelAdmin` = 3) and `Kecamatan`.
+- `model.User.LevelOrDefault()`: level yang tersimpan dipakai; bila kosong, role lama menentukan (`admin` → 3, lainnya → 1).
+- Pemetaan role lama → level: `store/sheets/users.go` (`LegacyLevel`), `ADMIN KECAMATAN`/`TARBIYAH KECAMATAN` → level 2 + district dari kolom `NAMA KECAMATAN`.
+- Level ikut disimpan di cookie sesi (`l`) dan di `/api/me`.
+
+### 5.2 — Scope di API
+- `model.Scope` (`CreatedBy`, `Kecamatan`) + `model.User.ScopeFor()`: level 3 → scope kosong (semua data), level 2 → scope district, level 1 → scope `created_by`.
+- `model.Filter.Scope` diisi di `api.go` (`handleListRekrutmen`) sehingga scope ikut terhitung dalam `total` (filter diterapkan sebelum pagination di store).
+- `model.MatchScope` dipakai di tiga store (local, sheets, supabase); store tidak tahu apa itu role/level.
+- `canAccess` memakai scope yang sama untuk `GET/PUT/DELETE /api/rekrutmen/{id}`, plus `check-wa` (record di luar scope dilaporkan ada tanpa detail).
+- `requireAdmin` (endpoint master/aktivitas/settings/hapus) masih berbasis `role`, bukan `level` — lihat bagian 5.3.
+- Test: `model_test.go` (`TestScopeFor`, `TestMatchScope`), `api/scope_test.go` (`TestAdminKecamatanOnlySeesOwnDistrict`, `TestAdminKecamatanCannotOpenAnotherDistrictRecord`).

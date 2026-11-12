@@ -24,8 +24,15 @@ type testEnv struct {
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
+	return newTestEnvWithUsers(t, nil)
+}
+
+// newTestEnvWithUsers starts an environment with the default accounts plus
+// the given ones, so a test can act as an account of a specific access level.
+func newTestEnvWithUsers(t *testing.T, extra []auth.User) *testEnv {
+	t.Helper()
 	dir := t.TempDir()
-	users := auth.DefaultUsers()
+	users := append(auth.DefaultUsers(), extra...)
 	authMgr := auth.NewManager(users, []byte("test-secret"))
 	setStore, err := settings.NewStore(filepath.Join(dir, "settings.json"))
 	if err != nil {
@@ -43,6 +50,31 @@ func newTestEnv(t *testing.T) *testEnv {
 		t.Fatal(err)
 	}
 	return &testEnv{t: t, server: srv, client: &http.Client{Jar: jar}, base: ts.URL}
+}
+
+// newTestUser builds a stored account with the given access level.
+func newTestUser(t *testing.T, username, password string, level int, kecamatan string) auth.User {
+	t.Helper()
+	salt, hash, err := auth.HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	role := model.RolePetugas
+	if level >= model.LevelAdmin {
+		role = model.RoleAdmin
+	}
+	return auth.User{
+		User: model.User{
+			ID:        username,
+			Username:  username,
+			Nama:      username,
+			Role:      role,
+			Level:     level,
+			Kecamatan: kecamatan,
+		},
+		PasswordHash: hash,
+		Salt:         salt,
+	}
 }
 
 // request performs an API call and decodes the JSON response.

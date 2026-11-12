@@ -1,7 +1,10 @@
 // Package model holds the domain types shared by the API and the storage providers.
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Picklist enums. These are fixed by the PRD.
 var (
@@ -94,11 +97,60 @@ type Filter struct {
 	Page      int
 	Limit     int
 
-	// CreatedBy narrows the listing to the records created by one account.
-	// It is set by the API layer for an ordinary officer, so the filter is
-	// applied before the rows are paginated and the reported total stays
-	// correct. An empty value means every record is visible.
+	// Scope narrows the listing to the records the account may reach. It is
+	// set by the API layer from the access level of the caller, so the scope
+	// is applied before the rows are paginated and the reported total stays
+	// correct. An empty scope means every record is visible.
+	Scope Scope
+}
+
+// Scope is the set of records an account may reach.
+//
+// It follows the rules of the previous application: a full administrator
+// reaches everything, a district administrator reaches the records of its own
+// district, and a member reaches only the records it created itself.
+type Scope struct {
+	// CreatedBy limits the records to the ones created by this account.
 	CreatedBy string
+	// Kecamatan limits the records to the ones of this district.
+	Kecamatan string
+}
+
+// Empty reports whether the scope reaches every record.
+func (s Scope) Empty() bool { return s.CreatedBy == "" && s.Kecamatan == "" }
+
+// MatchScope reports whether a record is within the scope.
+//
+// A scope carries one limit: the owner of the records or the district they
+// belong to. When both are given, the record has to satisfy both.
+func MatchScope(s Scope, r Rekrutmen) bool {
+	if s.CreatedBy != "" && r.CreatedBy != s.CreatedBy {
+		return false
+	}
+	if s.Kecamatan != "" && !strings.EqualFold(strings.TrimSpace(r.Kecamatan), strings.TrimSpace(s.Kecamatan)) {
+		return false
+	}
+	return true
+}
+
+// ScopeFor returns the records the account may reach.
+//
+// The level decides the scope, not the role, so a district administrator does
+// not receive the access of a full administrator.
+func (u User) ScopeFor() Scope {
+	switch u.LevelOrDefault() {
+	case LevelAdmin:
+		return Scope{}
+	case LevelAdminKecamatan:
+		if u.Kecamatan != "" {
+			return Scope{Kecamatan: u.Kecamatan}
+		}
+		// A district administrator without a district only reaches the
+		// records it created itself.
+		return Scope{CreatedBy: u.Username}
+	default:
+		return Scope{CreatedBy: u.Username}
+	}
 }
 
 // User is an authenticated account.
