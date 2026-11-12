@@ -2,11 +2,15 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
+import { isAdmin } from '../auth'
 import { METODE, STATUS, tingkatTone, statusTone, normalizeMetode } from '../constants'
 import { toast } from '../toast'
 import { confirmDialog } from '../confirm'
 
 const router = useRouter()
+
+// Only an admin may delete a record; an officer sees and edits their own.
+const admin = computed(() => isAdmin())
 
 const rows = ref([])
 const total = ref(0)
@@ -48,6 +52,22 @@ const activeFilters = computed(() => ({
   metode: filters.metode,
   status: filters.status
 }))
+
+// The empty list means two different things: the officer has not entered
+// anything yet, or the filter does not match any record.
+const hasActiveFilter = computed(() =>
+  Object.values(activeFilters.value).some((value) => value !== '')
+)
+
+const emptyTitle = computed(() =>
+  !admin.value && !hasActiveFilter.value ? 'Belum ada data Anda' : 'Tidak ada data'
+)
+
+const emptyMessage = computed(() =>
+  !admin.value && !hasActiveFilter.value
+    ? 'Data yang Anda input akan tampil di sini.'
+    : 'Belum ada data rekrutmen yang sesuai dengan filter yang dipilih.'
+)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
 
@@ -249,8 +269,8 @@ onMounted(() => {
 
         <template v-else-if="rows.length === 0">
           <div class="empty-state">
-            <div class="empty-state__title">Tidak ada data</div>
-            <p>Belum ada data rekrutmen yang sesuai dengan filter yang dipilih.</p>
+            <div class="empty-state__title">{{ emptyTitle }}</div>
+            <p>{{ emptyMessage }}</p>
           </div>
         </template>
 
@@ -294,6 +314,7 @@ onMounted(() => {
                     <div class="data-table__actions">
                       <button class="btn btn--secondary btn--sm" type="button" @click="editRecord(row)">Ubah</button>
                       <button
+                        v-if="admin"
                         class="btn btn--danger-soft btn--sm"
                         type="button"
                         :disabled="deletingId === row.id"
@@ -347,6 +368,7 @@ onMounted(() => {
               <div class="recruiter-card__actions">
                 <button class="btn btn--secondary btn--sm" type="button" @click="editRecord(row)">Ubah</button>
                 <button
+                  v-if="admin"
                   class="btn btn--danger-soft btn--sm"
                   type="button"
                   :disabled="deletingId === row.id"

@@ -93,6 +93,12 @@ type Filter struct {
 	Status    string
 	Page      int
 	Limit     int
+
+	// CreatedBy narrows the listing to the records created by one account.
+	// It is set by the API layer for an ordinary officer, so the filter is
+	// applied before the rows are paginated and the reported total stays
+	// correct. An empty value means every record is visible.
+	CreatedBy string
 }
 
 // User is an authenticated account.
@@ -101,6 +107,14 @@ type User struct {
 	Username string `json:"username"`
 	Nama     string `json:"nama"`
 	Role     string `json:"role"`
+
+	// Level is the access level of the account. It restores the granularity
+	// the previous application had, which a plain role cannot express.
+	Level int `json:"level"`
+
+	// Kecamatan is the district a district administrator is responsible for.
+	// It is only used by an administrator of level 2.
+	Kecamatan string `json:"kecamatan"`
 }
 
 // Roles.
@@ -108,3 +122,30 @@ const (
 	RoleAdmin   = "admin"
 	RolePetugas = "petugas"
 )
+
+// Access levels.
+//
+// The levels are ordered: a higher level reaches more data.
+const (
+	// LevelAnggota only reaches the records the account created.
+	LevelAnggota = 1
+	// LevelAdminKecamatan reaches the records of its own district.
+	LevelAdminKecamatan = 2
+	// LevelAdmin reaches every record.
+	LevelAdmin = 3
+)
+
+// LevelOrDefault returns the access level of the account.
+//
+// Accounts that were stored before the levels were introduced have no level,
+// so the role decides: an administrator reaches everything, an ordinary
+// officer only reaches its own records.
+func (u User) LevelOrDefault() int {
+	if u.Level > 0 {
+		return u.Level
+	}
+	if u.Role == RoleAdmin {
+		return LevelAdmin
+	}
+	return LevelAnggota
+}

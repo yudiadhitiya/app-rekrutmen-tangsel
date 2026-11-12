@@ -56,6 +56,17 @@ type Registrar interface {
 	RegisterUser(reg model.Registration) error
 }
 
+// LegacyProfiler reports the profile of an account of the previous
+// application, without checking its password.
+//
+// It is consulted for an account that was migrated before the access levels
+// were introduced, so that the level and the district are filled in.
+type LegacyProfiler interface {
+	// LegacyProfile returns the account as it is known to the previous
+	// application.
+	LegacyProfile(username string) (model.User, bool, error)
+}
+
 // User is a stored account with a password hash.
 type User struct {
 	model.User
@@ -71,6 +82,10 @@ type Manager struct {
 
 	// legacy verifies accounts of the previous application.
 	legacy LegacyAuthenticator
+
+	// profiler completes the profile of an account that was migrated before
+	// the access levels were introduced.
+	profiler LegacyProfiler
 
 	// registrar stores new member accounts.
 	registrar Registrar
@@ -95,6 +110,9 @@ func (m *Manager) SetLegacyAuthenticator(a LegacyAuthenticator) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.legacy = a
+	if p, ok := a.(LegacyProfiler); ok {
+		m.profiler = p
+	}
 }
 
 // SetRegistrar sets the store that keeps new member accounts.
@@ -154,6 +172,15 @@ func (m *Manager) VerifyLogin(username, password string) (model.User, bool, erro
 		if err := m.verifyStored(u, password); err != nil {
 			return model.User{}, false, err
 		}
+		// An account that was migrated before the access levels were
+		// introduced carries none. They are taken from the previous
+		// application, so an administrator of a district does not get the
+		// access of a full administrator.
+		if u.User.Level == 0 && isLegacyID(u.User.ID) {
+			if user, done := m.completeProfile(u.User); done {
+				u.User = user
+			}
+		}
 		return u.User, false, nil
 	}
 
@@ -172,6 +199,60 @@ func (m *Manager) VerifyLogin(username, password string) (model.User, bool, erro
 		return model.User{}, false, ErrInvalidCredentials
 	}
 	return user, true, nil
+}
+
+// isLegacyID reports whether the id belongs to an account of the previous
+// application.
+//
+// Such an account carries a generated identifier, while a local account
+// carries its own name as the id.
+func isLegacyID(id string) bool {
+	return strings.Contains(id, "-")
+}
+
+// completeProfile fills in the level and the district of an account that was
+// migrated before the access levels were introduced.
+//
+// The account is stored again, so the levels survive the next sign in.
+func (m *Manager) completeProfile(user model.User) (model.User, bool) {
+	m.mu.RLock()
+	profiler := m.profiler
+	m.mu.RUnlock()
+	if profiler == nil {
+		return user, false
+	}
+	profile, found, err := profiler.LegacyProfile(user.Username)
+	if err != nil || !found {
+		return user, false
+	}
+	user.Level = profile.Level
+	if profile.Kecamatan != "" {
+		user.Kecamatan = profile.Kecamatan
+	}
+	m.storeUser(user)
+	return user, true
+}
+
+// storeUser writes the account to the local store.
+func (m *Manager) storeUser(user model.User) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := strings.ToLower(strings.TrimSpace(user.Username))
+	u, ok := m.users[key]
+	if !ok {
+		return
+	}
+	u.User = user
+	m.users[key] = u
+	if m.path == "" {
+		return
+	}
+	all := make([]User, 0, len(m.users))
+	for _, item := range m.users {
+		all = append(all, item)
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].Username < all[j].Username })
+	_ = saveUsers(m.path, all)
 }
 
 // MigrateLegacyUser stores an account of the previous application locally.
@@ -260,13 +341,17 @@ func (m *Manager) VerifyPassword(username, password string) (model.User, error) 
 // SetSession writes a signed session cookie for the user.
 func (m *Manager) SetSession(w http.ResponseWriter, user model.User) error {
 	payload := struct {
-		Username string `json:"u"`
-		Role     string `json:"r"`
-		Expires  int64  `json:"e"`
+		Username  string `json:"u"`
+		Role      string `json:"r"`
+		Level     int    `json:"l"`
+		Kecamatan string `json:"k"`
+		Expires   int64  `json:"e"`
 	}{
-		Username: user.Username,
-		Role:     user.Role,
-		Expires:  time.Now().Add(sessionTTL).Unix(),
+		Username:  user.Username,
+		Role:      user.Role,
+		Level:     user.LevelOrDefault(),
+		Kecamatan: user.Kecamatan,
+		Expires:   time.Now().Add(sessionTTL).Unix(),
 	}
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -316,9 +401,11 @@ func (m *Manager) UserFromRequest(r *http.Request) (model.User, bool) {
 		return model.User{}, false
 	}
 	var payload struct {
-		Username string `json:"u"`
-		Role     string `json:"r"`
-		Expires  int64  `json:"e"`
+		Username  string `json:"u"`
+		Role      string `json:"r"`
+		Level     int    `json:"l"`
+		Kecamatan string `json:"k"`
+		Expires   int64  `json:"e"`
 	}
 	if err := json.Unmarshal(b, &payload); err != nil {
 		return model.User{}, false
@@ -330,7 +417,39 @@ func (m *Manager) UserFromRequest(r *http.Request) (model.User, bool) {
 	u, ok := m.users[strings.ToLower(payload.Username)]
 	m.mu.RUnlock()
 	if !ok {
-		return model.User{}, false
+		// The account is not stored locally, which is the case when every
+		// sign in is verified against the sheet of the previous application.
+		// The session is signed, so its payload can be trusted.
+		m.mu.RLock()
+		legacy := m.legacy
+		m.mu.RUnlock()
+		if legacy == nil {
+			return model.User{}, false
+		}
+		return model.User{
+			ID:        payload.Username,
+			Username:  payload.Username,
+			Role:      payload.Role,
+			Level:     payload.Level,
+			Kecamatan: payload.Kecamatan,
+		}, true
+	}
+	// The stored account is authoritative, but an account that was migrated
+	// before the levels were introduced carries none. The signed session then
+	// supplies them.
+	if u.User.Level == 0 {
+		u.User.Level = payload.Level
+	}
+	if u.User.Kecamatan == "" {
+		u.User.Kecamatan = payload.Kecamatan
+	}
+	// An account of the previous application that was migrated before the
+	// levels were introduced still needs them. They are taken from the
+	// previous application and stored, so this happens only once.
+	if u.User.Level == 0 && isLegacyID(u.User.ID) {
+		if user, done := m.completeProfile(u.User); done {
+			u.User = user
+		}
 	}
 	return u.User, true
 }

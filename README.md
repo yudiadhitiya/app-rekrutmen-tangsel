@@ -162,6 +162,18 @@ Peran dipetakan: `SYSTEM ADMIN`, `ADMIN PTD`, `ADMIN KECAMATAN` menjadi
 `admin`; `ANGGOTA` menjadi `petugas`. Akun dengan `AKTIF` selain `Y` dan akun
 tanpa `PASSWORD_HASH` tidak dapat masuk.
 
+Setiap akun juga membawa tingkat akses (`level`), seperti di aplikasi lama:
+
+| Peran lama | `level` | Cakupan data |
+| --- | --- | --- |
+| `SYSTEM ADMIN`, `ADMIN PTD`, `ADMIN DPD` | 3 | semua kecamatan |
+| `ADMIN KECAMATAN`, `TARBIYAH KECAMATAN` | 2 | kecamatan sendiri |
+| `ANGGOTA` | 1 | data yang ia buat sendiri |
+
+Admin kecamatannya diambil dari kolom `NAMA KECAMATAN` di tab `USERS`. Akun
+lokal yang sudah ada sebelumnya mendapat tingkatnya saat login pertama kali
+setelah perubahan ini.
+
 ### Daftar anggota mandiri (self-registration)
 
 Halaman login punya tombol **Belum punya akun? Daftar anggota**. Formulirnya

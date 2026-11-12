@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"rekrutmen-tangsel/backend/internal/model"
@@ -145,6 +146,67 @@ func TestMigrateLegacyUserStoresAccountLocally(t *testing.T) {
 	}
 	if _, _, err := m.VerifyLogin("anggota01", "salah"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatal("password salah harus ditolak setelah migrasi")
+	}
+}
+
+// fakeProfiler stands in for the profile of an account of the previous
+// application.
+type fakeProfiler struct {
+	user  model.User
+	found bool
+}
+
+func (f *fakeProfiler) LegacyProfile(username string) (model.User, bool, error) {
+	return f.user, f.found, nil
+}
+
+func TestVerifyLoginCompletesLevelOfMigratedAccount(t *testing.T) {
+	m := testManager(t)
+	path := filepath.Join(t.TempDir(), "users.json")
+	m.SetUsersPath(path)
+
+	// An account that was migrated before the levels were introduced: it
+	// carries a role but no level.
+	salt, hash, err := HashPassword("rahasia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.users["anggota01"] = User{
+		User:         model.User{ID: "a1b2c3d4-0000-0000-0000-000000000001", Username: "anggota01", Role: model.RoleAdmin},
+		PasswordHash: hash,
+		Salt:         salt,
+	}
+
+	profiler := &fakeProfiler{
+		found: true,
+		user: model.User{
+			Username:  "anggota01",
+			Role:      model.RoleAdmin,
+			Level:     model.LevelAdminKecamatan,
+			Kecamatan: "Serpong",
+		},
+	}
+	m.SetLegacyAuthenticator(&fakeLegacy{})
+	m.profiler = profiler
+
+	user, _, err := m.VerifyLogin("anggota01", "rahasia")
+	if err != nil {
+		t.Fatalf("VerifyLogin: %v", err)
+	}
+	if user.Level != model.LevelAdminKecamatan {
+		t.Errorf("level harus %d, dapat %d", model.LevelAdminKecamatan, user.Level)
+	}
+	if user.Kecamatan != "Serpong" {
+		t.Errorf("kecamatan harus Serpong, dapat %q", user.Kecamatan)
+	}
+
+	// The completed profile is stored, so it survives the next sign in.
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("baca file akun: %v", err)
+	}
+	if !strings.Contains(string(b), `"level": 2`) {
+		t.Errorf("level harus tersimpan di file akun: %s", string(b))
 	}
 }
 

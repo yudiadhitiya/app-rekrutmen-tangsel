@@ -35,6 +35,9 @@ type LegacyUser struct {
 	Role string
 	// Nama is the display name of the account.
 	Nama string
+	// Kecamatan is the district of the account. It is only filled for a
+	// district administrator.
+	Kecamatan string
 	// Aktif is the active flag: only "Y" accounts may sign in.
 	Aktif string
 }
@@ -43,13 +46,31 @@ type LegacyUser struct {
 // application.
 //
 // The previous application knew four roles; this application only distinguishes
-// an administrator from an ordinary officer.
+// an administrator from an ordinary officer. The finer distinction between
+// the levels is carried by LegacyLevel.
 func LegacyRole(role string) string {
 	switch strings.ToUpper(strings.TrimSpace(role)) {
 	case "SYSTEM ADMIN", "ADMIN PTD", "ADMIN DPD", "ADMIN KECAMATAN", "TARBIYAH KECAMATAN":
 		return model.RoleAdmin
 	default:
 		return model.RolePetugas
+	}
+}
+
+// LegacyLevel maps a role of the previous application to an access level of
+// this application.
+//
+// The previous application scoped the data per role: a district administrator
+// only saw its own district, a member only its own records, and the other
+// administrators saw everything. The level carries that distinction.
+func LegacyLevel(role string) int {
+	switch strings.ToUpper(strings.TrimSpace(role)) {
+	case "SYSTEM ADMIN", "ADMIN PTD", "ADMIN DPD":
+		return model.LevelAdmin
+	case "ADMIN KECAMATAN", "TARBIYAH KECAMATAN":
+		return model.LevelAdminKecamatan
+	default:
+		return model.LevelAnggota
 	}
 }
 
@@ -81,10 +102,35 @@ func (s *Store) VerifyLegacy(username, password string) (model.User, bool, error
 		return model.User{}, false, nil
 	}
 	return model.User{
-		ID:       LegacyUserID(user.Username),
-		Username: user.Username,
-		Nama:     user.Nama,
-		Role:     LegacyRole(user.Role),
+		ID:        LegacyUserID(user.Username),
+		Username:  user.Username,
+		Nama:      user.Nama,
+		Role:      LegacyRole(user.Role),
+		Level:     LegacyLevel(user.Role),
+		Kecamatan: user.Kecamatan,
+	}, true, nil
+}
+
+// LegacyProfile returns the access level and the district of an account of
+// the previous application, without checking a password.
+//
+// It is used to complete an account that was migrated before the levels were
+// introduced.
+func (s *Store) LegacyProfile(username string) (model.User, bool, error) {
+	user, found, err := s.findLegacyUser(username)
+	if err != nil {
+		return model.User{}, false, err
+	}
+	if !found {
+		return model.User{}, false, nil
+	}
+	return model.User{
+		ID:        LegacyUserID(user.Username),
+		Username:  user.Username,
+		Nama:      user.Nama,
+		Role:      LegacyRole(user.Role),
+		Level:     LegacyLevel(user.Role),
+		Kecamatan: user.Kecamatan,
 	}, true, nil
 }
 
@@ -106,6 +152,7 @@ func (s *Store) findLegacyUser(username string) (LegacyUser, bool, error) {
 	idxRole := indexOfHeader(headers, colRole)
 	idxNama := indexOfHeader(headers, colNama)
 	idxAktif := indexOfHeader(headers, colAktif)
+	idxKecamatan := indexOfHeader(headers, colNamaKecamatan)
 	if idxUsername < 0 || idxHash < 0 {
 		return LegacyUser{}, false, fmt.Errorf("google sheets: tab %q tidak punya kolom %q dan %q",
 			s.tabPengguna, colUsername, colPasswordHash)
@@ -130,6 +177,9 @@ func (s *Store) findLegacyUser(username string) (LegacyUser, bool, error) {
 		}
 		if idxAktif < len(row) {
 			u.Aktif = strings.TrimSpace(row[idxAktif])
+		}
+		if idxKecamatan >= 0 && idxKecamatan < len(row) {
+			u.Kecamatan = strings.TrimSpace(row[idxKecamatan])
 		}
 		return u, true, nil
 	}

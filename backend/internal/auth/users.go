@@ -15,9 +15,10 @@ func DefaultUsers() []User {
 	out := []User{}
 	for _, spec := range []struct {
 		username, password, nama, role string
+		level                          int
 	}{
-		{"admin", "admin123", "Administrator", model.RoleAdmin},
-		{"petugas", "petugas123", "Petugas", model.RolePetugas},
+		{"admin", "admin123", "Administrator", model.RoleAdmin, model.LevelAdmin},
+		{"petugas", "petugas123", "Petugas", model.RolePetugas, model.LevelAnggota},
 	} {
 		salt, hash, err := HashPassword(spec.password)
 		if err != nil {
@@ -29,6 +30,7 @@ func DefaultUsers() []User {
 				Username: spec.username,
 				Nama:     spec.nama,
 				Role:     spec.role,
+				Level:    spec.level,
 			},
 			PasswordHash: hash,
 			Salt:         salt,
@@ -52,6 +54,15 @@ func loadUsers(path string) ([]User, error) {
 	var users []User
 	if err := json.Unmarshal(b, &users); err != nil {
 		return nil, err
+	}
+	// An account that was stored before the access levels were introduced
+	// carries none. A local account keeps the access its role gives it. An
+	// account of the previous application keeps it empty, so its level can be
+	// taken from the previous application instead of being guessed.
+	for i := range users {
+		if users[i].Level == 0 && !isLegacyID(users[i].ID) {
+			users[i].Level = users[i].LevelOrDefault()
+		}
 	}
 	return users, nil
 }

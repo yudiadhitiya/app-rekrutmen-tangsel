@@ -96,6 +96,50 @@ func TestSheetsVerifyLegacyUserMapsRoles(t *testing.T) {
 	}
 }
 
+func TestSheetsVerifyLegacyUserMapsLevels(t *testing.T) {
+	s, fake := newTestStore(t)
+	seedUsersTab(t, fake, legacyUsersRows(sha256Hex("rahasia")))
+
+	cases := map[string]struct {
+		level     int
+		kecamatan string
+	}{
+		"admin02":   {model.LevelAdmin, "Ciputat"},
+		"adminkec":  {model.LevelAdminKecamatan, "Serpong"},
+		"anggota01": {model.LevelAnggota, "Pamulang"},
+	}
+	for username, want := range cases {
+		user, ok, err := s.VerifyLegacy(username, "rahasia")
+		if err != nil || !ok {
+			t.Fatalf("%s harus diterima: ok=%v err=%v", username, ok, err)
+		}
+		if user.Level != want.level {
+			t.Errorf("%s: level harus %d, dapat %d", username, want.level, user.Level)
+		}
+		if user.Kecamatan != want.kecamatan {
+			t.Errorf("%s: kecamatan harus %q, dapat %q", username, want.kecamatan, user.Kecamatan)
+		}
+	}
+}
+
+func TestLegacyLevelMapping(t *testing.T) {
+	cases := map[string]int{
+		"SYSTEM ADMIN":       model.LevelAdmin,
+		"ADMIN PTD":          model.LevelAdmin,
+		"ADMIN DPD":          model.LevelAdmin,
+		"ADMIN KECAMATAN":    model.LevelAdminKecamatan,
+		"TARBIYAH KECAMATAN": model.LevelAdminKecamatan,
+		"ANGGOTA":            model.LevelAnggota,
+		"":                   model.LevelAnggota,
+		"PERAN KUSTOM":       model.LevelAnggota,
+	}
+	for role, want := range cases {
+		if got := LegacyLevel(role); got != want {
+			t.Errorf("role %q harus jadi level %d, dapat %d", role, want, got)
+		}
+	}
+}
+
 func TestSheetsVerifyLegacyUserReportsMissingTab(t *testing.T) {
 	s, _ := newTestStore(t)
 	// The USERS tab does not exist in the fake spreadsheet.

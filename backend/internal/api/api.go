@@ -246,7 +246,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/rekrutmen/{id}", s.requireAuth(s.handleGetRekrutmen))
 	mux.HandleFunc("POST /api/rekrutmen", s.requireAuth(s.handleCreateRekrutmen))
 	mux.HandleFunc("PUT /api/rekrutmen/{id}", s.requireAuth(s.handleUpdateRekrutmen))
-	mux.HandleFunc("DELETE /api/rekrutmen/{id}", s.requireAuth(s.handleDeleteRekrutmen))
+	mux.HandleFunc("DELETE /api/rekrutmen/{id}", s.requireAdmin(s.handleDeleteRekrutmen))
 
 	// Settings.
 	mux.HandleFunc("GET /api/settings", s.requireAdmin(s.handleGetSettings))
@@ -463,6 +463,11 @@ func (s *Server) handleListRekrutmen(w http.ResponseWriter, r *http.Request, use
 		Page:      page,
 		Limit:     limit,
 	}
+	// An admin reaches every record. An ordinary officer only reaches the
+	// records they created themselves.
+	if user.Role != model.RoleAdmin {
+		f.CreatedBy = user.Username
+	}
 	data, total, err := s.Store().ListRekrutmen(f)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
@@ -495,7 +500,23 @@ func (s *Server) handleGetRekrutmen(w http.ResponseWriter, r *http.Request, user
 		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
 		return
 	}
+	if !canAccess(user, rec.CreatedBy) {
+		writeError(w, http.StatusNotFound, "data tidak ditemukan")
+		return
+	}
 	writeJSON(w, http.StatusOK, rec)
+}
+
+// canAccess reports whether a user may read or change a record.
+//
+// An admin reaches every record. An ordinary officer only reaches the records
+// they created themselves, which is the rule the previous application applied
+// to its members. A record without an owner stays with the admins.
+func canAccess(user model.User, createdBy string) bool {
+	if user.Role == model.RoleAdmin {
+		return true
+	}
+	return createdBy != "" && createdBy == user.Username
 }
 
 // handleCheckWA reports whether a WhatsApp number is already registered, so the
@@ -592,11 +613,14 @@ func (s *Server) handleUpdateRekrutmen(w http.ResponseWriter, r *http.Request, u
 		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
 		return
 	}
+	if !canAccess(user, prev.CreatedBy) {
+		writeError(w, http.StatusNotFound, "data tidak ditemukan")
+		return
+	}
 	rec.CreatedAt = prev.CreatedAt
 	rec.CreatedBy = prev.CreatedBy
 	rec.UpdatedAt = time.Now().UTC()
 	rec.UpdatedBy = user.Username
-
 	if err := s.Store().UpdateRekrutmen(rec); err != nil {
 		switch {
 		case errors.Is(err, store.ErrDuplicateWA):
