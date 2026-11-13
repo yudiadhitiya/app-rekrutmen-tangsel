@@ -31,9 +31,9 @@ Pamulang, Setu), 54 kelurahan total.
 | Method | Path | Role | Notes |
 |---|---|---|---|
 | GET | `/aktivitas` | any | `[{id,nama,aktif}]` sorted by nama |
-| POST | `/aktivitas` | admin | `{nama}` → created |
-| PUT | `/aktivitas/:id` | admin | `{nama, aktif}` |
-| DELETE | `/aktivitas/:id` | admin | 409 if referenced by a rekrutmen record |
+| POST | `/aktivitas` | admin penuh (level 3) | `{nama}` → created |
+| PUT | `/aktivitas/:id` | admin penuh (level 3) | `{nama, aktif}` |
+| DELETE | `/aktivitas/:id` | admin penuh (level 3) | 409 if referenced by a rekrutmen record |
 
 ## Rekrutmen
 
@@ -43,7 +43,7 @@ Pamulang, Setu), 54 kelurahan total.
 | GET | `/rekrutmen/:id` | any | |
 | POST | `/rekrutmen` | any | body = record, no `id` |
 | PUT | `/rekrutmen/:id` | any | |
-| DELETE | `/rekrutmen/:id` | any | |
+| DELETE | `/rekrutmen/:id` | admin penuh (level 3) | |
 | GET | `/rekrutmen/check-wa?no=628123` | any | `{exists:bool, id?:string}` — warn-before-save check |
 
 `GET /rekrutmen` →

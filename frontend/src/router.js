@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { auth, loadUser, isAdmin } from './auth'
+import { auth, loadUser, isFullAdmin } from './auth'
 
 import LoginView from './views/LoginView.vue'
 import ListView from './views/ListView.vue'
@@ -34,7 +34,7 @@ router.beforeEach(async (to) => {
   if (!user) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
-  if (to.meta.admin && !isAdmin()) {
+  if (to.meta.admin && !isFullAdmin()) {
     return { path: '/' }
   }
   return true

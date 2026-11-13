@@ -2,15 +2,16 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
-import { isAdmin } from '../auth'
+import { isFullAdmin, isMemberOnly } from '../auth'
 import { METODE, STATUS, tingkatTone, statusTone, normalizeMetode } from '../constants'
 import { toast } from '../toast'
 import { confirmDialog } from '../confirm'
 
 const router = useRouter()
 
-// Only an admin may delete a record; an officer sees and edits their own.
-const admin = computed(() => isAdmin())
+// Only a full administrator may delete a record; the others see and edit
+// the records within their own scope.
+const admin = computed(() => isFullAdmin())
 
 const rows = ref([])
 const total = ref(0)
@@ -59,12 +60,14 @@ const hasActiveFilter = computed(() =>
   Object.values(activeFilters.value).some((value) => value !== '')
 )
 
+const member = computed(() => isMemberOnly())
+
 const emptyTitle = computed(() =>
-  !admin.value && !hasActiveFilter.value ? 'Belum ada data Anda' : 'Tidak ada data'
+  member.value && !hasActiveFilter.value ? 'Belum ada data Anda' : 'Tidak ada data'
 )
 
 const emptyMessage = computed(() =>
-  !admin.value && !hasActiveFilter.value
+  member.value && !hasActiveFilter.value
     ? 'Data yang Anda input akan tampil di sini.'
     : 'Belum ada data rekrutmen yang sesuai dengan filter yang dipilih.'
 )

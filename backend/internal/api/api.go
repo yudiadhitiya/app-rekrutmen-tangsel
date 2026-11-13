@@ -203,10 +203,14 @@ func (s *Server) requireAuth(next func(http.ResponseWriter, *http.Request, model
 	}
 }
 
-// requireAdmin wraps a handler so it only runs for admins.
+// requireAdmin wraps a handler so it only runs for an administrator.
+//
+// The access level decides, not the plain role. Only a full administrator
+// (level 3) passes, which keeps the actions of the previous application that
+// were reserved for its top administrators.
 func (s *Server) requireAdmin(next func(http.ResponseWriter, *http.Request, model.User)) http.HandlerFunc {
 	return s.requireAuth(func(w http.ResponseWriter, r *http.Request, user model.User) {
-		if user.Role != model.RoleAdmin {
+		if !user.IsFullAdmin() {
 			writeError(w, http.StatusForbidden, "hanya admin yang dapat melakukan aksi ini")
 			return
 		}

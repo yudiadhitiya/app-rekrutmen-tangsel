@@ -49,6 +49,17 @@ type LegacyAuthenticator interface {
 	VerifyLegacy(username, password string) (model.User, bool, error)
 }
 
+// LegacyLookup reports whether an account of the previous application exists,
+// without checking its password.
+//
+// It lets the manager tell an account that the previous application does not
+// know from an account whose password is simply wrong.
+type LegacyLookup interface {
+	// LookupLegacy returns the account as it is known to the previous
+	// application.
+	LookupLegacy(username string) (model.User, bool, error)
+}
+
 // Registrar creates a new account in an external account store, such as the
 // USERS sheet of the previous application.
 type Registrar interface {
@@ -89,6 +100,11 @@ type Manager struct {
 
 	// registrar stores new member accounts.
 	registrar Registrar
+
+	// sheetOnly means every sign in is verified against the account store of
+	// the previous application, so a local copy of an account is never
+	// authoritative.
+	sheetOnly bool
 
 	// path is the file the accounts are stored in. It is empty when the
 	// manager must not write to disk.
@@ -144,6 +160,17 @@ func (m *Manager) RegisterUser(reg model.Registration) error {
 	return registrar.RegisterUser(reg)
 }
 
+// SetSheetOnly makes the account store of the previous application the only
+// authority for a sign in.
+//
+// A local copy of an account is then no longer used to verify a password, so a
+// change of the password or of the role in that store takes effect at once.
+func (m *Manager) SetSheetOnly(v bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sheetOnly = v
+}
+
 // SetUsersPath sets the file the accounts are stored in, so a migrated
 // account can be written to it.
 func (m *Manager) SetUsersPath(path string) {
@@ -158,6 +185,10 @@ func (m *Manager) SetUsersPath(path string) {
 // the accounts of the previous application are consulted, so a user can sign
 // in with the credentials they already had.
 //
+// When the manager is set to sheet only, the accounts of the previous
+// application are the authority: their password decides the sign in. A local
+// account that the previous application does not know still signs in locally.
+//
 // The returned bool reports whether the login came from the previous
 // application, which means the account can be migrated.
 func (m *Manager) VerifyLogin(username, password string) (model.User, bool, error) {
@@ -166,7 +197,24 @@ func (m *Manager) VerifyLogin(username, password string) (model.User, bool, erro
 	m.mu.RLock()
 	u, ok := m.users[key]
 	legacy := m.legacy
+	sheetOnly := m.sheetOnly
 	m.mu.RUnlock()
+
+	if sheetOnly && legacy != nil {
+		user, valid, err := legacy.VerifyLegacy(username, password)
+		if err != nil {
+			return model.User{}, false, err
+		}
+		if valid {
+			return user, true, nil
+		}
+		// The previous application knows the account, so its password is
+		// wrong or the account is not active. A local copy must not accept
+		// it.
+		if known, determined := legacyKnown(legacy, username); determined && known {
+			return model.User{}, false, ErrInvalidCredentials
+		}
+	}
 
 	if ok {
 		if err := m.verifyStored(u, password); err != nil {
@@ -199,6 +247,23 @@ func (m *Manager) VerifyLogin(username, password string) (model.User, bool, erro
 		return model.User{}, false, ErrInvalidCredentials
 	}
 	return user, true, nil
+}
+
+// legacyKnown reports whether the account store of the previous application
+// knows the account.
+//
+// The second bool reports whether the store could be asked. A store that
+// cannot tell is treated as not knowing the account.
+func legacyKnown(legacy LegacyAuthenticator, username string) (known, determined bool) {
+	l, ok := legacy.(LegacyLookup)
+	if !ok {
+		return false, false
+	}
+	_, found, err := l.LookupLegacy(username)
+	if err != nil {
+		return false, false
+	}
+	return found, true
 }
 
 // isLegacyID reports whether the id belongs to an account of the previous
@@ -415,6 +480,7 @@ func (m *Manager) UserFromRequest(r *http.Request) (model.User, bool) {
 	}
 	m.mu.RLock()
 	u, ok := m.users[strings.ToLower(payload.Username)]
+	sheetOnly := m.sheetOnly
 	m.mu.RUnlock()
 	if !ok {
 		// The account is not stored locally, which is the case when every
@@ -441,6 +507,13 @@ func (m *Manager) UserFromRequest(r *http.Request) (model.User, bool) {
 		u.User.Level = payload.Level
 	}
 	if u.User.Kecamatan == "" {
+		u.User.Kecamatan = payload.Kecamatan
+	}
+	if sheetOnly {
+		// The account store of the previous application is the authority, so
+		// the values it gave at the sign in win over the local copy.
+		u.User.Role = payload.Role
+		u.User.Level = payload.Level
 		u.User.Kecamatan = payload.Kecamatan
 	}
 	// An account of the previous application that was migrated before the

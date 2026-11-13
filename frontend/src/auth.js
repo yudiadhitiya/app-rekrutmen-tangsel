@@ -13,6 +13,31 @@ export function isAdmin() {
   return !!(auth.user && auth.user.role === 'admin')
 }
 
+// The full administrator is the account of level 3. It is the only one that
+// may manage the master data, the settings, and delete a record. Accounts
+// without a level fall back to the role, so older sessions keep working.
+export function isFullAdmin() {
+  if (!auth.user) return false
+  if (auth.user.level) return auth.user.level >= 3
+  return auth.user.role === 'admin'
+}
+
+// The label of the account, which follows its access level.
+export function roleLabel() {
+  if (!auth.user) return ''
+  if (auth.user.level === 3) return 'Admin'
+  if (auth.user.level === 2) return 'Admin Kecamatan'
+  return auth.user.role === 'admin' ? 'Admin' : 'Petugas'
+}
+
+// A member only reaches the records it created itself, so an empty list
+// means it has not entered anything yet.
+export function isMemberOnly() {
+  if (!auth.user) return false
+  if (auth.user.level) return auth.user.level < 2
+  return auth.user.role !== 'admin'
+}
+
 export async function loadUser(force = false) {
   if (auth.loaded && !force) return auth.user
   auth.loading = true

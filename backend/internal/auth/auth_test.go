@@ -222,3 +222,74 @@ func TestMigrateLegacyUserKeepsExistingAccount(t *testing.T) {
 		t.Fatalf("akun lokal harus tetap berlaku: %v", err)
 	}
 }
+
+// fakeLookupLegacy stands in for an account store that can also tell whether
+// it knows an account.
+type fakeLookupLegacy struct {
+	fakeLegacy
+	known bool
+}
+
+func (f *fakeLookupLegacy) LookupLegacy(username string) (model.User, bool, error) {
+	return model.User{Username: username}, f.known, nil
+}
+
+func TestSheetOnlyUsesTheAccountStore(t *testing.T) {
+	m := testManager(t)
+	legacy := &fakeLookupLegacy{
+		fakeLegacy: fakeLegacy{ok: true, user: model.User{
+			ID: "u1", Username: "admin", Nama: "Admin Sheet", Role: model.RoleAdmin,
+		}},
+		known: true,
+	}
+	m.SetLegacyAuthenticator(legacy)
+	m.SetSheetOnly(true)
+
+	user, fromLegacy, err := m.VerifyLogin("admin", "apa-saja")
+	if err != nil {
+		t.Fatalf("VerifyLogin: %v", err)
+	}
+	if !fromLegacy {
+		t.Error("login harus berasal dari sumber warisan")
+	}
+	if user.Nama != "Admin Sheet" {
+		t.Errorf("akun harus berasal dari sheet: %+v", user)
+	}
+}
+
+func TestSheetOnlyRejectsWrongPasswordOfKnownAccount(t *testing.T) {
+	m := testManager(t)
+	legacy := &fakeLookupLegacy{
+		fakeLegacy: fakeLegacy{ok: false},
+		known:      true,
+	}
+	m.SetLegacyAuthenticator(legacy)
+	m.SetSheetOnly(true)
+
+	// The local copy of "admin" has the right password, but the store is the
+	// authority, so the sign in must fail.
+	if _, _, err := m.VerifyLogin("admin", "admin123"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("harus ErrInvalidCredentials, dapat %v", err)
+	}
+}
+
+func TestSheetOnlyFallsBackToAccountUnknownToTheStore(t *testing.T) {
+	m := testManager(t)
+	legacy := &fakeLookupLegacy{
+		fakeLegacy: fakeLegacy{ok: false},
+		known:      false,
+	}
+	m.SetLegacyAuthenticator(legacy)
+	m.SetSheetOnly(true)
+
+	user, fromLegacy, err := m.VerifyLogin("admin", "admin123")
+	if err != nil {
+		t.Fatalf("VerifyLogin: %v", err)
+	}
+	if fromLegacy {
+		t.Error("akun lokal tidak boleh dilaporkan sebagai warisan")
+	}
+	if user.Username != "admin" {
+		t.Errorf("user: %+v", user)
+	}
+}

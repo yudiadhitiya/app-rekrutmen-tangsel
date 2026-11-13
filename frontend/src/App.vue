@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { auth, isAdmin, logout } from './auth'
+import { auth, isFullAdmin, roleLabel, logout } from './auth'
 import Toast from './components/Toast.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 
@@ -9,7 +9,7 @@ const route = useRoute()
 const router = useRouter()
 
 const isPublicPage = computed(() => !!route.meta.public)
-const admin = computed(() => isAdmin())
+const admin = computed(() => isFullAdmin())
 
 const navLinks = computed(() => {
   const links = [
@@ -21,10 +21,7 @@ const navLinks = computed(() => {
   return links
 })
 
-const roleLabel = computed(() => {
-  if (!auth.user) return ''
-  return auth.user.role === 'admin' ? 'Admin' : 'Petugas'
-})
+const userRoleLabel = computed(() => roleLabel())
 
 async function handleLogout() {
   await logout()
@@ -50,7 +47,7 @@ async function handleLogout() {
         <div class="app-bar__user">
           <div class="app-bar__identity">
             <span class="app-bar__name">{{ auth.user ? auth.user.nama || auth.user.username : '' }}</span>
-            <span class="app-bar__role">{{ roleLabel }}</span>
+            <span class="app-bar__role">{{ userRoleLabel }}</span>
           </div>
           <button class="btn btn--secondary btn--sm" type="button" @click="handleLogout">Keluar</button>
         </div>

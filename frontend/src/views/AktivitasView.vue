@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { api } from '../api'
-import { isAdmin } from '../auth'
+import { isFullAdmin } from '../auth'
 import { toast } from '../toast'
 import { confirmDialog } from '../confirm'
 
@@ -16,7 +16,8 @@ const editingId = ref(null)
 const editForm = reactive({ nama: '', aktif: true })
 const savingEdit = ref(false)
 
-const admin = isAdmin()
+// Only a full administrator may manage the master data.
+const admin = isFullAdmin()
 
 async function loadItems() {
   loading.value = true

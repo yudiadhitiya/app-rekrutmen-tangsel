@@ -168,3 +168,35 @@ func TestOnlyAdminCanDeleteRecord(t *testing.T) {
 		t.Fatalf("delete as admin: expected 200, got %d", code)
 	}
 }
+
+func TestAdminKecamatanCannotDeleteOrManageMaster(t *testing.T) {
+	e := newTestEnvWithUsers(t, []auth.User{
+		newTestUser(t, "kec", "kec12345", model.LevelAdminKecamatan, "Serpong"),
+	})
+
+	e.loginAs("admin", "admin123")
+	var rec model.Rekrutmen
+	if code := e.request(http.MethodPost, "/api/rekrutmen", validBody(), &rec); code != http.StatusCreated {
+		t.Fatalf("create: expected 201, got %d", code)
+	}
+
+	// The district administrator may not delete a record.
+	e.loginAs("kec", "kec12345")
+	if code := e.request(http.MethodDelete, "/api/rekrutmen/"+rec.ID, nil, nil); code != http.StatusForbidden {
+		t.Fatalf("delete as admin kecamatan: expected 403, got %d", code)
+	}
+
+	// It may not manage the master data either.
+	if code := e.request(http.MethodPost, "/api/aktivitas", map[string]string{"nama": "Uji"}, nil); code != http.StatusForbidden {
+		t.Fatalf("create aktivitas as admin kecamatan: expected 403, got %d", code)
+	}
+	if code := e.request(http.MethodGet, "/api/settings", nil, nil); code != http.StatusForbidden {
+		t.Fatalf("settings as admin kecamatan: expected 403, got %d", code)
+	}
+
+	// The full administrator may.
+	e.loginAs("admin", "admin123")
+	if code := e.request(http.MethodDelete, "/api/rekrutmen/"+rec.ID, nil, nil); code != http.StatusOK {
+		t.Fatalf("delete as full admin: expected 200, got %d", code)
+	}
+}

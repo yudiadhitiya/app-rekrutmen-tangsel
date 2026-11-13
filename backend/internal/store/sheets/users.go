@@ -134,6 +134,29 @@ func (s *Store) LegacyProfile(username string) (model.User, bool, error) {
 	}, true, nil
 }
 
+// LookupLegacy returns an account of the previous application, without
+// checking its password.
+//
+// It implements the auth.LegacyLookup contract, so the auth package can tell
+// an account that is unknown from an account whose password is wrong.
+func (s *Store) LookupLegacy(username string) (model.User, bool, error) {
+	user, found, err := s.findLegacyUser(username)
+	if err != nil {
+		return model.User{}, false, err
+	}
+	if !found {
+		return model.User{}, false, nil
+	}
+	return model.User{
+		ID:        LegacyUserID(user.Username),
+		Username:  user.Username,
+		Nama:      user.Nama,
+		Role:      LegacyRole(user.Role),
+		Level:     LegacyLevel(user.Role),
+		Kecamatan: user.Kecamatan,
+	}, true, nil
+}
+
 // findLegacyUser looks up an account of the previous application by name.
 func (s *Store) findLegacyUser(username string) (LegacyUser, bool, error) {
 	want := strings.ToLower(strings.TrimSpace(username))

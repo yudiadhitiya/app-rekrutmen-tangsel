@@ -269,9 +269,13 @@ func (s *Store) checkSourceTab(ctx context.Context) error {
 }
 
 // hasTab reports whether the list contains a tab with the given title.
+//
+// The comparison ignores the case, because the spreadsheet itself does: a
+// range may name a tab in another case than the tab carries.
 func hasTab(tabs []sheetInfo, title string) bool {
+	want := strings.ToLower(strings.TrimSpace(title))
 	for _, t := range tabs {
-		if t.Title == title {
+		if strings.ToLower(strings.TrimSpace(t.Title)) == want {
 			return true
 		}
 	}
@@ -320,17 +324,15 @@ func (s *Store) invalidateTabs() {
 
 // fetchTabs reads the spreadsheet metadata and returns its tabs.
 func (s *Store) fetchTabs(ctx context.Context) ([]sheetInfo, error) {
-	tok, err := s.token(ctx)
-	if err != nil {
-		return nil, err
-	}
 	u := fmt.Sprintf("%s/%s", s.baseURL, url.PathEscape(s.spreadsheetID))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	resp, err := s.http.Do(req)
+	resp, err := s.send(ctx, func(tok string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		return req, nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -395,10 +397,6 @@ func colLetter(n int) string {
 
 // createSheet adds a new tab to the spreadsheet.
 func (s *Store) createSheet(ctx context.Context, sheet string) error {
-	tok, err := s.token(ctx)
-	if err != nil {
-		return err
-	}
 	// A tab is added through the batchUpdate endpoint of the spreadsheet.
 	u := fmt.Sprintf("%s/%s:batchUpdate", s.baseURL, url.PathEscape(s.spreadsheetID))
 	b, err := json.Marshal(map[string]any{
@@ -409,13 +407,15 @@ func (s *Store) createSheet(ctx context.Context, sheet string) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.http.Do(req)
+	resp, err := s.send(ctx, func(tok string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(b))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return err
 	}
@@ -523,6 +523,49 @@ func (s *Store) token(ctx context.Context) (string, error) {
 	return s.accessTok, nil
 }
 
+// invalidateToken drops the cached access token, so the next call fetches a
+// fresh one.
+func (s *Store) invalidateToken() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.accessTok = ""
+	s.tokExpiry = time.Time{}
+}
+
+// send sends a request to the Sheets API.
+//
+// The builder puts the access token on the request. When the API rejects the
+// token, a fresh one is fetched and the request is sent again, so a long
+// running process keeps working when its token is no longer accepted.
+func (s *Store) send(ctx context.Context, build func(token string) (*http.Request, error)) (*http.Response, error) {
+	tok, err := s.token(ctx)
+	if err != nil {
+		return nil, err
+	}
+	req, err := build(tok)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		return resp, nil
+	}
+	resp.Body.Close()
+	s.invalidateToken()
+	tok, err = s.token(ctx)
+	if err != nil {
+		return nil, err
+	}
+	req, err = build(tok)
+	if err != nil {
+		return nil, err
+	}
+	return s.http.Do(req)
+}
+
 // assertion builds the signed JWT used as the OAuth2 client assertion.
 func (s *Store) assertion() (string, error) {
 	now := time.Now()
@@ -581,50 +624,43 @@ type sheetEntry struct {
 }
 
 // readSheet returns all data rows of a tab, keyed by the header row.
+//
+// The values are stored under the name of the field they belong to, so a tab
+// of the previous application is read the same way as the tab of this
+// application. The original header stays available as well.
 func (s *Store) readSheet(ctx context.Context, sheet string) ([]sheetEntry, error) {
-	tok, err := s.token(ctx)
+	header, rows, err := s.readTab(ctx, sheet)
 	if err != nil {
 		return nil, err
 	}
-	// The range covers the whole grid of the tab, so a tab that is wider or
-	// narrower than the default 26 columns is read completely.
-	last := colLetter(s.tabColumns(ctx, sheet))
-	u := fmt.Sprintf("%s/%s/values/%s!A1:%s",
-		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), last)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	resp, err := s.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("google sheets: read %s: %d: %s", sheet, resp.StatusCode, string(body))
-	}
-	var out struct {
-		Values [][]string `json:"values"`
-	}
-	if err := json.Unmarshal(body, &out); err != nil {
-		return nil, err
-	}
-	if len(out.Values) == 0 {
+	if len(header) == 0 {
 		return nil, nil
 	}
-	header := out.Values[0]
-	entries := make([]sheetEntry, 0, len(out.Values)-1)
-	for i, vals := range out.Values[1:] {
+	cm, err := ResolveColumnMap(header, AppColumnSpec())
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]sheetEntry, 0, len(rows))
+	uplAlt := altUPLColumn(header)
+	for i, vals := range rows {
 		if len(vals) == 0 || (len(vals) == 1 && vals[0] == "") {
 			continue
 		}
 		row := sheetRow{}
-		for i, h := range header {
-			if i < len(vals) {
-				row[h] = vals[i]
+		for j, h := range header {
+			if j < len(vals) {
+				row[h] = vals[j]
 			}
+		}
+		for field, idx := range cm.Index {
+			if idx < len(vals) {
+				row[field] = vals[idx]
+			}
+		}
+		// The tab of the previous application splits the UPL over two
+		// columns, so the one that is filled is the one that counts.
+		if uplAlt >= 0 && row[FieldUPL] == "" && uplAlt < len(vals) {
+			row[FieldUPL] = vals[uplAlt]
 		}
 		// Row 1 is the header, so the first data row is row 2.
 		entries = append(entries, sheetEntry{num: i + 2, row: row})
@@ -632,25 +668,81 @@ func (s *Store) readSheet(ctx context.Context, sheet string) ([]sheetEntry, erro
 	return entries, nil
 }
 
+// altUPLColumn returns the index of the second UPL column of the tab of the
+// previous application, or -1 when the tab has only one.
+//
+// The old tab has UPLS and UPLM, so a record may carry its value in either
+// column.
+func altUPLColumn(header []string) int {
+	for i, h := range header {
+		if normalizeHeader(h) == "uplm" {
+			return i
+		}
+	}
+	return -1
+}
+
+// readTab returns the header row and the data rows of a tab.
+func (s *Store) readTab(ctx context.Context, sheet string) ([]string, [][]string, error) {
+	// The range covers the whole grid of the tab, so a tab that is wider or
+	// narrower than the default 26 columns is read completely.
+	last := colLetter(s.tabColumns(ctx, sheet))
+	u := fmt.Sprintf("%s/%s/values/%s!A1:%s",
+		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), last)
+	resp, err := s.send(ctx, func(tok string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		return req, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	if resp.StatusCode != http.StatusOK {
+		if isMissingTab(resp.StatusCode, string(body)) {
+			// The tab does not exist yet, so it holds no rows.
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("google sheets: read %s: %d: %s", sheet, resp.StatusCode, string(body))
+	}
+	var out struct {
+		Values [][]string `json:"values"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, nil, err
+	}
+	if len(out.Values) == 0 {
+		return nil, nil, nil
+	}
+	header := out.Values[0]
+	rows := make([][]string, 0, len(out.Values)-1)
+	for _, vals := range out.Values[1:] {
+		rows = append(rows, vals)
+	}
+	return header, rows, nil
+}
+
 // appendRow appends a row to a tab.
 func (s *Store) appendRow(ctx context.Context, sheet string, values []string) error {
-	tok, err := s.token(ctx)
-	if err != nil {
-		return err
-	}
 	u := fmt.Sprintf("%s/%s/values/%s:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",
 		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet))
 	b, err := json.Marshal(map[string]any{"values": [][]string{values}})
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.http.Do(req)
+	resp, err := s.send(ctx, func(tok string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(b))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return err
 	}
@@ -664,24 +756,22 @@ func (s *Store) appendRow(ctx context.Context, sheet string, values []string) er
 
 // updateRow writes values into a specific row (1-based, including the header).
 func (s *Store) updateRow(ctx context.Context, sheet string, row int, values []string) error {
-	tok, err := s.token(ctx)
-	if err != nil {
-		return err
-	}
 	last := colLetter(s.tabColumns(ctx, sheet))
-	u := fmt.Sprintf("%s/%s/values/%s!A%d:%s%d",
+	u := fmt.Sprintf("%s/%s/values/%s!A%d:%s%d?valueInputOption=RAW",
 		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), row, last, row)
 	b, err := json.Marshal(map[string]any{"values": [][]string{values}})
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, u, bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.http.Do(req)
+	resp, err := s.send(ctx, func(tok string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPut, u, bytes.NewReader(b))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return err
 	}
@@ -695,20 +785,18 @@ func (s *Store) updateRow(ctx context.Context, sheet string, row int, values []s
 
 // deleteRow clears the contents of a row.
 func (s *Store) deleteRow(ctx context.Context, sheet string, row int) error {
-	tok, err := s.token(ctx)
-	if err != nil {
-		return err
-	}
 	last := colLetter(s.tabColumns(ctx, sheet))
 	u := fmt.Sprintf("%s/%s/values/%s!A%d:%s%d:clear",
 		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet), row, last, row)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader("{}"))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.http.Do(req)
+	resp, err := s.send(ctx, func(tok string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader("{}"))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return err
 	}
@@ -741,10 +829,88 @@ func rekrutmenToValues(r model.Rekrutmen) []string {
 	}
 }
 
+// rekrutmenRowValues lays the record out in the columns of the tab.
+//
+// The tab may use the layout of this application or the older one, so the
+// values are placed by the resolved column layout and the tab keeps its own
+// order.
+//
+// A column that the layout does not know keeps the value it had, so an update
+// never empties a column of the tab of the previous application.
+func rekrutmenRowValues(cm ColumnMap, r model.Rekrutmen, existing sheetRow) []string {
+	values := map[string]string{
+		FieldID:                r.ID,
+		FieldNama:              r.Nama,
+		FieldNoWA:              r.NoWA,
+		FieldAlamat:            r.Alamat,
+		FieldRT:                r.RT,
+		FieldRW:                r.RW,
+		FieldKecamatan:         r.Kecamatan,
+		FieldKelurahan:         r.Kelurahan,
+		FieldAktivitas:         r.Aktivitas,
+		FieldTingkatPenerimaan: r.TingkatPenerimaan,
+		FieldMetode:            r.Metode,
+		FieldStatus:            r.Status,
+		FieldKeterangan:        r.Keterangan,
+		FieldUPL:               r.UPL,
+		FieldCreatedAt:         r.CreatedAt.UTC().Format(time.RFC3339),
+		FieldUpdatedAt:         r.UpdatedAt.UTC().Format(time.RFC3339),
+		FieldCreatedBy:         r.CreatedBy,
+		FieldUpdatedBy:         r.UpdatedBy,
+		FieldUploader:          r.CreatedBy,
+	}
+	out := make([]string, len(cm.Headers))
+	written := make(map[int]bool, len(cm.Index))
+	for field, idx := range cm.Index {
+		if idx >= 0 && idx < len(out) {
+			out[idx] = values[field]
+			written[idx] = true
+		}
+	}
+	// A column the layout does not know keeps the value it had, so an update
+	// never empties a column of the tab of the previous application.
+	for idx := range out {
+		if written[idx] {
+			continue
+		}
+		if v, ok := existing[cm.Headers[idx]]; ok {
+			out[idx] = v
+		}
+	}
+	// The uploader column of the tab of the previous application holds the
+	// name of the member who recorded the recruitment, so it is kept when the
+	// tab already carries one.
+	if idx, ok := cm.Index[FieldUploader]; ok && idx < len(out) {
+		if v := existing[cm.Headers[idx]]; v != "" {
+			out[idx] = v
+		}
+	}
+	return out
+}
+
+// tabColumnMap resolves the column layout of a tab.
+func (s *Store) tabColumnMap(ctx context.Context, tab string) (ColumnMap, error) {
+	header, _, err := s.readTab(ctx, tab)
+	if err != nil {
+		return ColumnMap{}, err
+	}
+	if len(header) == 0 {
+		header = rekrutmenHeaders
+	}
+	return ResolveColumnMap(header, AppColumnSpec())
+}
+
 func valuesToRekrutmen(row sheetRow) model.Rekrutmen {
 	parseTime := func(s string) time.Time {
-		t, _ := time.Parse(time.RFC3339, s)
-		return t
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			return t
+		}
+		// The tab of the previous application writes the date as day, month
+		// and year.
+		if t, err := time.Parse("02/01/2006", s); err == nil {
+			return t
+		}
+		return time.Time{}
 	}
 	return model.Rekrutmen{
 		ID:                row["id"],
@@ -874,7 +1040,11 @@ func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
 		return err
 	}
 	r.Metode = model.NormalizeMetode(r.Metode)
-	return s.appendRow(ctx, s.tabRekrutmen, rekrutmenToValues(*r))
+	cm, err := s.tabColumnMap(ctx, s.tabRekrutmen)
+	if err != nil {
+		return err
+	}
+	return s.appendRow(ctx, s.tabRekrutmen, rekrutmenRowValues(cm, *r, nil))
 }
 
 func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
@@ -891,7 +1061,11 @@ func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 	for _, e := range rows {
 		if e.row["id"] == r.ID {
 			r.Metode = model.NormalizeMetode(r.Metode)
-			return s.updateRow(ctx, s.tabRekrutmen, e.num, rekrutmenToValues(*r))
+			cm, err := s.tabColumnMap(ctx, s.tabRekrutmen)
+			if err != nil {
+				return err
+			}
+			return s.updateRow(ctx, s.tabRekrutmen, e.num, rekrutmenRowValues(cm, *r, e.row))
 		}
 	}
 	return store.ErrNotFound
@@ -911,8 +1085,38 @@ func (s *Store) DeleteRekrutmen(id string) error {
 	return store.ErrNotFound
 }
 
+// isMissingTab reports whether the API answered that the tab does not exist.
+func isMissingTab(status int, body string) bool {
+	if status == http.StatusNotFound {
+		return true
+	}
+	return status == http.StatusBadRequest && strings.Contains(body, "Unable to parse range")
+}
+
+// ensureTab creates the tab with its header row when it is missing.
+func (s *Store) ensureTab(ctx context.Context, sheet string, headers []string) error {
+	tabs, err := s.listTabs(ctx)
+	if err != nil {
+		return err
+	}
+	if !hasTab(tabs, sheet) {
+		if err := s.createSheet(ctx, sheet); err != nil {
+			return err
+		}
+		return s.appendRow(ctx, sheet, headers)
+	}
+	return nil
+}
+
+// ListAktivitas returns the master list of activities.
 func (s *Store) ListAktivitas() ([]model.Aktivitas, error) {
-	rows, err := s.readSheet(context.Background(), s.tabAktivitas)
+	ctx := context.Background()
+	// The tab is created when it is missing, so a fresh spreadsheet works
+	// without manual setup.
+	if err := s.ensureTab(ctx, s.tabAktivitas, aktivitasHeaders); err != nil {
+		return nil, err
+	}
+	rows, err := s.readSheet(ctx, s.tabAktivitas)
 	if err != nil {
 		return nil, err
 	}
@@ -976,7 +1180,11 @@ func (s *Store) renameAktivitas(ctx context.Context, oldName, newName string) er
 		}
 		r := valuesToRekrutmen(e.row)
 		r.Aktivitas = newName
-		if err := s.updateRow(ctx, s.tabRekrutmen, e.num, rekrutmenToValues(r)); err != nil {
+		cm, err := s.tabColumnMap(ctx, s.tabRekrutmen)
+		if err != nil {
+			return err
+		}
+		if err := s.updateRow(ctx, s.tabRekrutmen, e.num, rekrutmenRowValues(cm, r, e.row)); err != nil {
 			return err
 		}
 	}

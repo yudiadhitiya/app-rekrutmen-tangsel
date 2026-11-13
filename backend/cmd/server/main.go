@@ -70,6 +70,11 @@ func main() {
 			// New member accounts are written to the same sheet, so a member
 			// can sign in with them in both applications.
 			authMgr.SetRegistrar(legacyStore)
+			if legacyMode == "sheet" {
+				// Every sign in is verified against the sheet, so a local
+				// copy of an account never decides a sign in.
+				authMgr.SetSheetOnly(true)
+			}
 			tabPengguna := os.Getenv("GOOGLE_SHEETS_TAB_PENGGUNA")
 			if tabPengguna == "" {
 				tabPengguna = sheets.DefaultTabPengguna

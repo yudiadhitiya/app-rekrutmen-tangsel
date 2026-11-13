@@ -201,3 +201,12 @@ func (u User) LevelOrDefault() int {
 	}
 	return LevelAnggota
 }
+
+// IsFullAdmin reports whether the account is a full administrator.
+//
+// Only a full administrator may manage the master data, the settings, and
+// delete a record, which are the actions the previous application reserved
+// for its top administrators.
+func (u User) IsFullAdmin() bool {
+	return u.LevelOrDefault() >= LevelAdmin
+}

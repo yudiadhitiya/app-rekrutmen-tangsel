@@ -122,7 +122,13 @@ backend, akses langsung dari browser ditolak.
 5. Admin → Pengaturan → pilih provider **Google Sheets**.
 
 Tab `Rekrutmen` dan `Aktivitas` beserta header-nya dibuat otomatis saat
-provider pertama kali dipakai.
+provider pertama kali dipakai. Tab `REKRUTMEN` milik aplikasi lama juga bisa
+langsung dipakai: header lamanya dikenali, jadi data lama terbaca dan data
+baru ditulis dengan kolom tab tersebut.
+
+Provider aktif tersimpan di `DATA_DIR/settings.json` (`{"provider":
+"google_sheets"}`), jadi pilihan itu tetap berlaku di setiap penjalanan
+backend. Mengganti provider lewat menu **Pengaturan** juga menulis file itu.
 
 ### Lokasi file kredensial
 
@@ -155,7 +161,7 @@ jadi login berikutnya tidak perlu menyentuh spreadsheet lagi.
 | `LEGACY_AUTH_MODE` | Perilaku |
 | --- | --- |
 | `upgrade` (default) | login pertama memakai akun lama, lalu akun disimpan lokal |
-| `sheet` | setiap login dicek ke tab `USERS`; akun tidak disalin lokal |
+| `sheet` | setiap login dicek ke tab `USERS`; salinan lokal di `data/users.json` tidak dipakai sebagai penentu password |
 | `off` | akun lama tidak dipakai sama sekali |
 
 Peran dipetakan: `SYSTEM ADMIN`, `ADMIN PTD`, `ADMIN KECAMATAN` menjadi
@@ -173,6 +179,10 @@ Setiap akun juga membawa tingkat akses (`level`), seperti di aplikasi lama:
 Admin kecamatannya diambil dari kolom `NAMA KECAMATAN` di tab `USERS`. Akun
 lokal yang sudah ada sebelumnya mendapat tingkatnya saat login pertama kali
 setelah perubahan ini.
+
+Hak managerial mengikuti `level`: hanya `level` 3 (admin penuh) yang boleh
+menghapus data, mengelola master aktivitas, dan membuka Pengaturan. Admin
+kecamatan (`level` 2) hanya mengelola data kecamatannya sendiri.
 
 ### Daftar anggota mandiri (self-registration)
 

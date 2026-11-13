@@ -26,19 +26,17 @@ func (s *Store) Tabs(ctx context.Context) ([]string, error) {
 // The rows are returned as they are in the sheet, so a caller that knows the
 // column layout can read them positionally. Empty rows are skipped.
 func (s *Store) ReadTab(ctx context.Context, tab string) ([]string, [][]string, error) {
-	tok, err := s.token(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
 	last := colLetter(s.tabColumns(ctx, tab))
 	u := fmt.Sprintf("%s/%s/values/%s!A1:%s",
 		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(tab), last)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	resp, err := s.http.Do(req)
+	resp, err := s.send(ctx, func(tok string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		return req, nil
+	})
 	if err != nil {
 		return nil, nil, err
 	}

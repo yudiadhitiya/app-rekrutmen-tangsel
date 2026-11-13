@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"rekrutmen-tangsel/backend/internal/model"
 )
 
 func TestResolveColumnMapMatchesAliases(t *testing.T) {
@@ -165,5 +167,107 @@ func TestDerivedIDIsStable(t *testing.T) {
 	c := DerivedID("6281234567890", ts.Add(time.Minute))
 	if a == c {
 		t.Fatal("id yang berbeda harus berbeda")
+	}
+}
+
+// legacyHeaders is the header row of the tab of the previous application.
+var legacyHeaders = []string{
+	"ID", "NAMA ANGGOTA", "NAMA TARGET", "NO WHATSAPP", "NAMA KECAMATAN",
+	"ALAMAT", "RT", "RW", "KECAMATAN", "KELURAHAN", "UPLS", "UPLM",
+	"AKTIFITAS", "TINGKAT PENERIMAAN", "METODE", "STATUS", "KETERANGAN",
+	"CREATED_AT", "UPDATED_AT", "CREATED_BY",
+}
+
+func TestAppColumnSpecResolvesLegacyHeaders(t *testing.T) {
+	cm, err := ResolveColumnMap(legacyHeaders, AppColumnSpec())
+	if err != nil {
+		t.Fatalf("ResolveColumnMap: %v", err)
+	}
+	cases := []struct {
+		field string
+		col   string
+	}{
+		{FieldID, "ID"},
+		{FieldNama, "NAMA TARGET"},
+		{FieldNoWA, "NO WHATSAPP"},
+		{FieldKecamatan, "KECAMATAN"},
+		{FieldAktivitas, "AKTIFITAS"},
+		{FieldTingkatPenerimaan, "TINGKAT PENERIMAAN"},
+		{FieldUPL, "UPLS"},
+		{FieldCreatedAt, "CREATED_AT"},
+		{FieldCreatedBy, "CREATED_BY"},
+		{FieldUploader, "NAMA ANGGOTA"},
+	}
+	for _, c := range cases {
+		idx, ok := cm.Index[c.field]
+		if !ok {
+			t.Errorf("field %q tidak terpetakan", c.field)
+			continue
+		}
+		if legacyHeaders[idx] != c.col {
+			t.Errorf("field %q harus ke kolom %q, dapat %q", c.field, c.col, legacyHeaders[idx])
+		}
+	}
+}
+
+func TestRekrutmenRowValuesFollowsTheTabLayout(t *testing.T) {
+	cm, err := ResolveColumnMap(legacyHeaders, AppColumnSpec())
+	if err != nil {
+		t.Fatalf("ResolveColumnMap: %v", err)
+	}
+	rec := model.Rekrutmen{
+		ID:        "abc",
+		Nama:      "Uju Juhiwa",
+		NoWA:      "85198971242",
+		Kecamatan: "Pondok Aren",
+		Aktivitas: "Pedagang",
+		CreatedBy: "umar",
+	}
+	vals := rekrutmenRowValues(cm, rec, nil)
+	if len(vals) != len(legacyHeaders) {
+		t.Fatalf("jumlah kolom: %d, harus %d", len(vals), len(legacyHeaders))
+	}
+	for field, want := range map[string]string{
+		FieldID:        rec.ID,
+		FieldNama:      rec.Nama,
+		FieldNoWA:      rec.NoWA,
+		FieldKecamatan: rec.Kecamatan,
+		FieldAktivitas: rec.Aktivitas,
+		FieldCreatedBy: rec.CreatedBy,
+		FieldUploader:  rec.CreatedBy,
+	} {
+		idx := cm.Index[field]
+		if vals[idx] != want {
+			t.Errorf("kolom %q: %q, harus %q", legacyHeaders[idx], vals[idx], want)
+		}
+	}
+}
+
+func TestRekrutmenRowValuesKeepsUnknownColumns(t *testing.T) {
+	cm, err := ResolveColumnMap(legacyHeaders, AppColumnSpec())
+	if err != nil {
+		t.Fatalf("ResolveColumnMap: %v", err)
+	}
+	existing := sheetRow{
+		"NAMA KECAMATAN": "Serpong",
+		"UPLM":          "UPLM",
+		"NAMA ANGGOTA":  "Kader Serpong",
+	}
+	rec := model.Rekrutmen{
+		ID:        "abc",
+		Nama:      "Uju Juhiwa",
+		CreatedBy: "umar",
+	}
+	vals := rekrutmenRowValues(cm, rec, existing)
+	for _, col := range []string{"NAMA KECAMATAN", "UPLM", "NAMA ANGGOTA"} {
+		idx := cm.Index[""]
+		for i, h := range legacyHeaders {
+			if h == col {
+				idx = i
+			}
+		}
+		if vals[idx] != existing[col] {
+			t.Errorf("kolom %q: %q, harus tetap %q", col, vals[idx], existing[col])
+		}
 	}
 }

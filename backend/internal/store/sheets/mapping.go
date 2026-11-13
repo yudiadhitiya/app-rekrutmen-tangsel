@@ -30,6 +30,16 @@ const (
 	// FieldTimestamp is not a model field: it is the column a Google Form
 	// response sheet uses for the submission time.
 	FieldTimestamp = "timestamp"
+
+	// Fields the model keeps beside the recruitment itself.
+	FieldCreatedAt = "created_at"
+	FieldUpdatedAt = "updated_at"
+	FieldCreatedBy = "created_by"
+	FieldUpdatedBy = "updated_by"
+
+	// FieldUploader is the member who recorded the recruitment. It is a
+	// column of the tab of the previous application.
+	FieldUploader = "uploader"
 )
 
 // ColumnSpec says which sheet headers may carry one field.
@@ -76,6 +86,36 @@ func FormColumnSpec() []ColumnSpec {
 		{Field: FieldStatus, Aliases: []string{"status"}},
 		{Field: FieldKeterangan, Aliases: []string{"keterangan", "catatan"}},
 		{Field: FieldUPL, Aliases: []string{"upl"}},
+	}
+}
+
+// AppColumnSpec is the layout of the tab the application owns.
+//
+// Besides the headers of this application, it accepts the headers of the tab
+// of the previous application, so one provider reads and writes both layouts.
+// In the older layout "NAMA TARGET" carries the name of the recruited person
+// and "NAMA ANGGOTA" the name of the member who recorded it.
+func AppColumnSpec() []ColumnSpec {
+	return []ColumnSpec{
+		{Field: FieldID, Aliases: []string{"id"}},
+		{Field: FieldNama, Aliases: []string{"nama", "nama target", "nama anggota"}},
+		{Field: FieldNoWA, Aliases: []string{"no_wa", "no wa", "no whatsapp", "nomor whatsapp", "whatsapp"}},
+		{Field: FieldAlamat, Aliases: []string{"alamat"}},
+		{Field: FieldRT, Aliases: []string{"rt"}},
+		{Field: FieldRW, Aliases: []string{"rw"}},
+		{Field: FieldKecamatan, Aliases: []string{"kecamatan", "nama kecamatan"}},
+		{Field: FieldKelurahan, Aliases: []string{"kelurahan"}},
+		{Field: FieldAktivitas, Aliases: []string{"aktivitas", "aktifitas"}},
+		{Field: FieldTingkatPenerimaan, Aliases: []string{"tingkat_penerimaan", "tingkat penerimaan"}},
+		{Field: FieldMetode, Aliases: []string{"metode"}},
+		{Field: FieldStatus, Aliases: []string{"status"}},
+		{Field: FieldKeterangan, Aliases: []string{"keterangan", "catatan"}},
+		{Field: FieldUPL, Aliases: []string{"upl", "upls", "uplm"}},
+		{Field: FieldCreatedAt, Aliases: []string{"created_at"}},
+		{Field: FieldUpdatedAt, Aliases: []string{"updated_at"}},
+		{Field: FieldCreatedBy, Aliases: []string{"created_by"}},
+		{Field: FieldUpdatedBy, Aliases: []string{"updated_by"}},
+		{Field: FieldUploader, Aliases: []string{"nama anggota"}},
 	}
 }
 
