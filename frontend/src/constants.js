@@ -10,10 +10,15 @@ export const TINGKAT_PENERIMAAN = [
 
 export const METODE = ['Halaqoh', 'Program Antara', 'Dakwah Fardiyah']
 
-// Maps the retired Metode values to the current "Program Antara" option.
+// Maps the retired Metode values to their current option.
+//
+// "Halaqah" and "Dakwah Fardliyah" are the spellings of the previous
+// application, so a file that was filled there still uploads.
 const METODE_LAMA = {
   Program: 'Program Antara',
-  Antara: 'Program Antara'
+  Antara: 'Program Antara',
+  Halaqah: 'Halaqoh',
+  'Dakwah Fardliyah': 'Dakwah Fardiyah'
 }
 
 // NormalizeMetode folds a retired Metode value into its current replacement.

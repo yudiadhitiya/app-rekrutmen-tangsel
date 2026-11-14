@@ -1047,6 +1047,82 @@ func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
 	return s.appendRow(ctx, s.tabRekrutmen, rekrutmenRowValues(cm, *r, nil))
 }
 
+// CreateRekrutmenBatch stores many records in one call.
+//
+// The column layout is resolved once and the rows are written in chunks, so
+// a thousand rows cost a handful of requests instead of a thousand.
+func (s *Store) CreateRekrutmenBatch(records []model.Rekrutmen) error {
+	if len(records) == 0 {
+		return nil
+	}
+	ctx := context.Background()
+	// The tab is read once, so a thousand rows do not cost a thousand reads.
+	rows, err := s.readSheet(ctx, s.tabRekrutmen)
+	if err != nil {
+		return err
+	}
+	taken := make(map[string]bool, len(rows))
+	for _, e := range rows {
+		if no := e.row["no_wa"]; no != "" {
+			taken[no] = true
+		}
+	}
+	for _, r := range records {
+		if taken[r.NoWA] {
+			return store.ErrDuplicateWA
+		}
+		taken[r.NoWA] = true
+	}
+	cm, err := s.tabColumnMap(ctx, s.tabRekrutmen)
+	if err != nil {
+		return err
+	}
+	values := make([][]string, 0, len(records))
+	for i := range records {
+		records[i].Metode = model.NormalizeMetode(records[i].Metode)
+		values = append(values, rekrutmenRowValues(cm, records[i], nil))
+	}
+	const chunk = 200
+	for start := 0; start < len(values); start += chunk {
+		end := start + chunk
+		if end > len(values) {
+			end = len(values)
+		}
+		if err := s.appendRows(ctx, s.tabRekrutmen, values[start:end]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// appendRows appends several rows to a tab in one request.
+func (s *Store) appendRows(ctx context.Context, sheet string, values [][]string) error {
+	u := fmt.Sprintf("%s/%s/values/%s:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",
+		s.baseURL, url.PathEscape(s.spreadsheetID), url.PathEscape(sheet))
+	b, err := json.Marshal(map[string]any{"values": values})
+	if err != nil {
+		return err
+	}
+	resp, err := s.send(ctx, func(tok string) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(b))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		return req, nil
+	})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("google sheets: append %s: %d: %s", sheet, resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 	ctx := context.Background()
 	rows, err := s.readSheet(ctx, s.tabRekrutmen)

@@ -19,9 +19,14 @@ var (
 // The MVP initially shipped "Program" and "Antara" as two separate options.
 // The list was later corrected to a single "Program Antara" option, so
 // records stored with the old values are migrated on read.
+//
+// The previous application spelled two values differently ("Halaqah" and
+// "Dakwah Fardliyah"), so a file that was filled there still uploads here.
 var MetodeLama = map[string]string{
-	"Program": "Program Antara",
-	"Antara":  "Program Antara",
+	"Program":          "Program Antara",
+	"Antara":           "Program Antara",
+	"Halaqah":          "Halaqoh",
+	"Dakwah Fardliyah": "Dakwah Fardiyah",
 }
 
 // NormalizeMetode maps a retired Metode value to its current replacement.

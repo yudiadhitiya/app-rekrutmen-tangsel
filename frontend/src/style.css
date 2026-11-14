@@ -560,6 +560,81 @@ a:hover {
   margin-top: var(--space-5);
 }
 
+/* --------------------------------------------------------- batch upload -- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.loading-block--tight {
+  padding: var(--space-4) 0;
+  justify-content: flex-start;
+}
+
+.upload-errors {
+  margin-top: var(--space-3);
+}
+
+.upload-errors__title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.upload-errors__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.upload-errors__list li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.upload-errors__list li:last-child {
+  border-bottom: none;
+}
+
+.upload-errors__row {
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.upload-errors__field {
+  color: var(--muted);
+  font-size: 12px;
+  background: var(--muted-soft, #eef2f7);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
 /* --------------------------------------------------------------- alerts -- */
 
 .alert {

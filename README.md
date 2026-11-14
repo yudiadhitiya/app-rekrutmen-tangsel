@@ -181,8 +181,11 @@ lokal yang sudah ada sebelumnya mendapat tingkatnya saat login pertama kali
 setelah perubahan ini.
 
 Hak managerial mengikuti `level`: hanya `level` 3 (admin penuh) yang boleh
-menghapus data, mengelola master aktivitas, dan membuka Pengaturan. Admin
-kecamatan (`level` 2) hanya mengelola data kecamatannya sendiri.
+mengelola master aktivitas dan membuka Pengaturan. Admin kecamatan (`level` 2)
+hanya mengelola data kecamatannya sendiri dan tidak boleh menghapus data.
+
+Hapus data mengikuti aplikasi lama: anggota (`level` 1) boleh menghapus data
+yang ia input sendiri, admin penuh (`level` 3) boleh menghapus data mana pun.
 
 ### Daftar anggota mandiri (self-registration)
 

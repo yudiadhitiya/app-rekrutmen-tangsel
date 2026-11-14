@@ -43,7 +43,7 @@ Pamulang, Setu), 54 kelurahan total.
 | GET | `/rekrutmen/:id` | any | |
 | POST | `/rekrutmen` | any | body = record, no `id` |
 | PUT | `/rekrutmen/:id` | any | |
-| DELETE | `/rekrutmen/:id` | admin penuh (level 3) | |
+| DELETE | `/rekrutmen/:id` | anggota (data sendiri) atau admin penuh (level 3) | admin kecamatan (level 2) → 403 |
 | GET | `/rekrutmen/check-wa?no=628123` | any | `{exists:bool, id?:string}` — warn-before-save check |
 
 `GET /rekrutmen` →

@@ -1,8 +1,8 @@
 # Development Plan — Rekrutmen Tangsel
 
 **Status dokumen:** aktif, diperbarui per checkpoint
-**Terakhir diperbarui:** 2026-11-06
-**Commit baseline:** `3d7d05a` (fix: pertahankan jejak audit saat update rekrutmen)
+**Terakhir diperbarui:** 2026-11-14
+**Commit baseline:** `20ddf68` (update aplikasi)
 **Rujukan:** [`PRD_Rekrutmen_Tangsel_MVP.md`](PRD_Rekrutmen_Tangsel_MVP.md) v0.1,
 [`API_CONTRACT.md`](API_CONTRACT.md)
 
@@ -41,12 +41,18 @@ perubahan yang menggantung.
 | F3 — Penyimpanan | 10 | 0 | 2 | 12 |
 | F4 — Frontend | 27 | 0 | 4 | 31 |
 | F5 — Keamanan | 4 | 0 | 7 | 11 |
-| F6 — Kualitas & CI | 2 | 0 | 6 | 8 |
-| F7 — Fitur pelengkap PRD | 0 | 0 | 7 | 7 |
-| **Total** | **74** | **0** | **30** | **104** |
+| F6 — Kualitas & CI | 2 | 1 | 5 | 8 |
+| F7 — Fitur pelengkap PRD | 9 | 2 | 8 | 19 |
+| F8 — Granularity role (paritas app lama) | 4 | 4 | 0 | 8 |
+| **Total** | **87** | **7** | **30** | **124** |
 
-Status codebase: **build hijau, test hijau, siap didemokan** — belum siap
-diproduksi karena F5 (keamanan) dan F6 (CI) masih kosong.
+> Item D-176 dan sub-item D-176…D-186 di §9.1 dihitung **satu kali** di F7
+> (D-176 sebagai item induk; D-177…D-186 sebagai rinciannya).
+> Item D-187…D-194 di §9.2 dihitung di F8.
+> Status codebase: **build hijau, test hijau, siap didemokan** — belum siap
+> diproduksi karena F5 (keamanan) dan F6 (CI) masih kosong.
+> Item **🔧** = sudah ada kodenya di working tree dan teruji, tetapi belum
+> ter-commit; statusnya menjadi ✅ setelah commit (lihat §11).
 
 ---
 
@@ -208,7 +214,7 @@ Vue 3 + Vue Router + Vite. Sumber: `frontend/src/`.
 | D-91 | **GitHub Actions CI** | ⬜ | `.github/` belum ada |
 | D-92 | **Lint frontend** | ⬜ | tidak ada ESLint |
 | D-93 | **Test frontend (unit)** | ⬜ | lihat D-74 |
-| D-94 | **Test E2E (Playwright)** | ⬜ | belum ada |
+| D-94 | **Test E2E (Playwright)** | 🔧 | `playwright.config.ts` + `tests/e2e/browser-check.spec.ts` (hanya cek browser ke `example.com`); skenario aplikasi belum |
 | D-95 | **Pinning versi toolchain** | ⬜ | `go.mod` butuh `go 1.24`; Node belum di-pin |
 | D-96 | **Pre-commit hook** | ⬜ | `.claude/settings.json` hanya berisi hook graphify |
 
@@ -221,7 +227,7 @@ Vue 3 + Vue Router + Vite. Sumber: `frontend/src/`.
 | D-97 | **Ekspor/import + verifikasi ganti provider** | ⬜ | §7, §10 |
 | D-98 | **Manajemen pengguna (CRUD petugas)** | ⬜ | §2, §9 |
 | D-99 | **Dashboard & laporan analitik** | ⬜ | §11 — *di luar scope MVP*, fase berikutnya |
-| D-100 | **Impor massal Excel/CSV** | ⬜ | §11 — *di luar scope MVP* |
+| D-100 | **Impor massal Excel/CSV** | ⬜ | §11 — *dinaikkan prioritas*, lihat rencana §9.1 (D-176) |
 | D-101 | **Integrasi WhatsApp kirim pesan** | ⬜ | §11 — *di luar scope MVP* |
 | D-102 | **Workflow persetujuan berjenjang** | ⬜ | §11 — *di luar scope MVP* |
 | D-103 | **Sinkronisasi dua arah Supabase↔Sheets** | ⬜ | §11 — *di luar scope MVP* |
@@ -236,10 +242,151 @@ Vue 3 + Vue Router + Vite. Sumber: `frontend/src/`.
 | D-173 | **Akun baru memakai hash SHA-256 yang sama dengan aplikasi lama** | ✅ | password & jawaban keamanan di-hash SHA-256 tanpa salt,role `ANGGOTA`, `AKTIF`=`Y` |
 | D-174 | **Batas laju pendaftaran mandiri** | ✅ | 10 percobaan per alamat per 10 menit (`internal/api/register.go`) |
 | D-175 | **Pilihan pertanyaan keamanan & kecamatan untuk form daftar** | ✅ | `GET /api/register/options` |
+| D-176 | **Upload batch Excel/CSV untuk anggota (paritas app lama)** | 🔧 | rencana di §9.1 — backend selesai, UI & dokumentasi belum |
 
 > D-99 s.d. D-103 secara eksplisit **di luar scope MVP**. Item-item ini dicatat
 > agar tidak hilang, bukan untuk dikerjakan sekarang.
-> tidak hilang, bukan untuk dikerjakan sekarang.
+
+> **Catatan 2026-11-14:** D-100 (impor massal) **tidak lagi "di luar scope MVP"**.
+> Aplikasi lama sudah punya fitur ini dan dipakai harian oleh anggota
+> (`old-app/code.gs:732` `uploadRecruitments`, `old-app/index.html:322` tombol
+> Upload Excel) — di aplikasi baru fitur ini hilang, sehingga anggota hanya
+> input satu per satu. Rencana rinci ada di §9.1.
+
+---
+
+## 9.1 Rencana — Upload batch Excel untuk anggota (paritas app lama)
+
+**Status:** 🔧 sebagian — backend selesai & teruji, UI & dokumentasi belum ·
+**Tanggal:** 2026-11-14 · **Sumber:** analisis `old-app/code.gs` +
+`old-app/index.html`
+
+### 9.1.1 Perilaku aplikasi lama yang harus dipertahankan
+
+| Aspek | Perilaku app lama (sumber) |
+|---|---|
+| Siapa boleh | Hanya role `ANGGOTA` — `requireRole_(me, [ANGGOTA])` (`code.gs:735`), tombol disembunyikan untuk role lain (`index.html:530-536`) |
+| Format | Excel `.xlsx/.xls/.csv` via SheetJS (`index.html:325`), template 14 kolom (`index.html:992`) |
+| Template | `NAMA TARGET, NO WHATSAPP, ALAMAT, RT, RW, KECAMATAN, KELURAHAN, UPLS, UPLM, AKTIFITAS, TINGKAT PENERIMAAN, METODE, STATUS, KETERANGAN` + sheet `PETUNJUK` (`index.html:1004-1029`) |
+| Batas | Maksimal **1.000 baris** per upload (`code.gs:739`, `index.html:1080`) |
+| Validasi kolom | 8 kolom wajib; `UPLS` XOR `UPLM`; `KECAMATAN` harus ada di `TANGSEL_WILAYAH`; `KELURAHAN` harus milik kecamatan itu; `AKTIFITAS` harus dari daftar opsi (`code.gs:997-1009`) |
+| Sifat kegagalan | **All-or-nothing**: ada 1 baris salah → tidak ada baris tersimpan, pesan maks 30 error (`code.gs:766-780`) |
+| Field protektif | Diisi server dari session, tak bisa dipalsukan dari Excel: `ID` (UUID), `NAMA ANGGOTA` = `me.anggota`, `NAMA KECAMATAN` = `me.kecamatan`, `CREATED_AT`/`UPDATED_AT` = now, `CREATED_BY` = `me.username` (`code.gs:795-809`) |
+| Penulisan | Satu operasi tulis di bawah `LockService` (tunggu 30 detik) (`code.gs:785-813`) |
+| Notifikasi | Alert jumlah data tersimpan, lalu refresh dashboard + tabel (`index.html:1094-1097`) |
+
+> Catatan: app lama **tidak** mengecek duplikat `no_wa` saat upload. Server
+> baru sudah punya `store.ErrDuplicateWA`, jadi aturan baru harus diputuskan
+> (lihat 9.1.3).
+
+### 9.1.2 Prinsip implementasi
+
+1. **Parsing di client, validasi di server** — sama seperti app lama: browser
+   membaca file menjadi array objek, server memvalidasi ulang dan menyimpan.
+   Tidak perlu parser Excel di Go.
+2. **Tidak ada parser Excel di backend** → **keputusan berubah 2026-11-14:**
+   pustaka `xlsx` **tidak** dipasang ke `frontend/package.json`. Berkas
+   `frontend/src/excel.js` memuat SheetJS **dari CDN** saat file `.xlsx`
+   benar-benar dipilih (`cdn.sheetjs.com`, sama seperti app lama), dan
+   berkas `.csv` dibaca tanpa pustaka apa pun. Bundle tetap kecil, tidak ada
+   dependensi npm baru — tetapi butuh internet saat memakai berkas Excel.
+3. **Field protektif diisi server** — `created_by`, `updated_by`, `created_at`,
+   `updated_at`, dan kolom `NAMA ANGGOTA`/uploader diambil dari session, bukan
+   dari payload.
+4. **Semua-or-nothing**, dengan laporan error per baris (maks 30 ditampilkan).
+5. **Scope konsisten** — baris hasil upload otomatis berada di scope
+   penginput (anggota = `created_by` = username), sehingga anggota langsung
+   melihat datanya sendiri.
+
+### 9.1.3 Keputusan (sudah diambil 2026-11-14, sudah diterapkan di kode)
+
+| # | Pertanyaan | Keputusan | Penerapan |
+|---|---|---|---|
+| K-1 | Siapa boleh upload? | **Anggota (level 1) saja** — paritas app lama | `requireUpload` → 403 untuk selain anggota (`api/batch.go`) |
+| K-2 | `no_wa` duplikat terhadap data yang sudah ada | **Lewati baris duplikat + laporkan di ringkasan** | `skipped[]` pada respons 201 |
+| K-3 | Duplikat di dalam file yang sama | **Gagal** (hanya baris itu yang salah) | pesan "nomor whatsapp sama dengan baris N" |
+| K-4 | Batas ukuran file | 5 MB | `MaxBatchBody` (5 << 20) |
+| K-5 | Nama endpoint | `POST /api/rekrutmen/batch` | terdaftar di `api.go` |
+| K-6 | Header `X-UUpload-Mode` | **Tidak dipakai** — tidak ada kebutuhan mode berbeda | body JSON polos berisi array baris |
+
+### 9.1.4 Item pekerjaan
+
+| # | Item | Status | Verifikasi |
+|---|---|---|---|
+| D-176 | Kontrak endpoint `POST /api/rekrutmen/batch` (body: array baris) | 🔧 | route ada di `api.go`; `API_CONTRACT.md` **belum** diperbarui |
+| D-177 | Hak akses endpoint (level 1) + penolakan 403 | 🔧 | `requireUpload`; `TestBatchIsOnlyForMembers` lulus |
+| D-178 | Validasi per baris all-or-nothing + laporan error bernomor baris | 🔧 | `TestBatchSavesNothingWhenOneRowIsWrong` lulus |
+| D-179 | Pemetaan kolom Excel (alias) → `model.Rekrutmen` | 🔧 | peta lokal di `api/batch.go` (**bukan** `AppColumnSpec()`); alias app lama & nama field app ini diterima |
+| D-180 | Field protektif diisi server (created_by/updated_by/timestamp/uploader) | 🔧 | `TestBatchIgnoresTheOwnerColumnsOfTheFile` lulus |
+| D-181 | Parser Excel di frontend + unduh template | 🔧 | `frontend/src/excel.js` (CSV tanpa pustaka, `.xlsx` via CDN SheetJS) dipakai `components/BatchUpload.vue` |
+| D-182 | UI: tombol Upload + Template (khusus anggota), progress, ringkasan hasil | 🔧 | `frontend/src/components/BatchUpload.vue` + `canUpload()` di `auth.js`; hanya level 1 yang melihat tombolnya |
+| D-183 | Batas: maks 1.000 baris, 5 MB, rate limit sederhana | 🔧 | `MaxBatchRows`, `MaxBatchBody`, `uploadLimiter` (5×/10 mnt); **timeout** belum ada |
+| D-184 | Penanganan `no_wa` duplikat (K-2/K-3) | 🔧 | `TestBatchSkipsANumberThatIsAlreadyStored`, `TestBatchRejectsTwoRowsWithTheSameNumber` lulus |
+| D-185 | Test otomatis: validasi, scope, field protektif, all-or-nothing | 🔧 | 8 test di `api/batch_test.go` lulus; test `CreateRekrutmenBatch` per provider belum |
+| D-186 | Dokumentasi: README, API_CONTRACT, ANALISIS_AKSES_DATA (paritas app lama) | ⬜ | ketiga dokumen belum disentuh |
+| D-195 | Ejaan enum `Metode` dari app lama (`Halaqah`, `Dakwah Fardliyah`) diterima saat upload dan dinormalkan | 🔧 | `model.MetodeLama` + `constants.js` `METODE_LAMA`; `TestBatchAcceptsTheSpellingsOfThePreviousApplication` |
+
+### 9.1.5 Urutan pengerjaan —Kemajuan
+
+| # | Langkah | Status |
+|---|---|---|
+| 1 | D-179 + D-180 (model & pemetaan kolom) | 🔧 selesai (peta lokal, bukan `AppColumnSpec()`) |
+| 2 | D-176 + D-177 + D-178 (endpoint + hak akses + validasi) + D-184 (duplikat) | 🔧 selesai, `API_CONTRACT.md` menyusul |
+| 3 | D-185 test backend | 🔧 sebagian — 8 test lulus |
+| 4 | D-181 + D-182 (frontend: parser, template, tombol, ringkasan) | 🔧 selesai — `BatchUpload.vue` terpasang di `ListView.vue` |
+| 5 | D-183 (batas & rate limit), D-186 (dokumentasi) | 🔧 sebagian / ⬜ |
+
+### 9.1.6 Peringatan / risiko
+
+- **Bukan menambah dependency npm** — keputusan berubah: SheetJS dimuat dari
+  CDN saat dipakai, jadi bundle tidak naik. Risikonya: berkas `.xlsx` butuh
+  internet; berkas `.csv` tetap jalan tanpa internet.
+- **Penulisan massal ke Google Sheets** bisa melewati kuota & batas 1.000 baris
+  per update → tulis bertahap (mis. 200 baris per panggilan) dengan jeda.
+- `store.ErrDuplicateWA` berbeda dari app lama → lihat K-2.
+- Endpoint baru membuka jalur input baru → wajib rate limit (D-183) dan
+  validasi ulang di server, bukan hanya di client.
+- **Kode frontend sudah tersambung** — `frontend/src/excel.js` dipakai
+  `frontend/src/components/BatchUpload.vue`, yang terpasang di `ListView.vue`
+  dan hanya tampil untuk anggota (level 1). Alur upload sudah diuji lewat
+  server lokal: unggah valid → `created`; baris salah → 400 + daftar error
+  bernomor baris; nomor ganda → 400; admin penuh → 403.
+
+### 9.2 Granularity role — pemulangan hak akses aplikasi lama
+
+**Status:** 🔧 sebagian · **Tanggal:** 2026-11-14 · **Sumber:** analisis
+`old-app/code.gs` + `old-app/index.html`, dan `ANALISIS_AKSES_DATA.md` §5.1–5.3
+
+#### 9.2.1 Perilaku aplikasi lama yang dipulangkan
+
+| Aspek | Perilaku app lama (sumber) |
+|---|---|
+| Tingkat akses | 3 tingkat: `ANGGOTA` (1), `ADMIN KECAMATAN` (2), `ADMIN PTD`/`SYSTEM ADMIN` (3) |
+| Scope baca | anggota → data sendiri; admin kecamatan → data kecamatannya; admin penuh → semua |
+| Hak hapus | `requireRole_(me, [ANGGOTA])` **+** `CREATED_BY` harus sama (`old-app/code.gs:873-882`); tombol Hapus hanya untuk `ANGGOTA` (`old-app/index.html:896`) |
+| Master & pengaturan | khusus admin penuh |
+
+> Catatan: aplikasi lama **tidak** memberi hak hapus ke admin. Versi ini
+> menambah hak hapus untuk admin penuh (level 3) dan tetap menutupnya untuk
+> admin kecamatan — keputusan yang lebih longgar bagi admin penuh, dicatat di
+> `ANALISIS_AKSES_DATA.md` §5.3.
+
+#### 9.2.2 Item pekerjaan
+
+| # | Item | Status | Verifikasi |
+|---|---|---|---|
+| D-187 | Model level akses (1/2/3) + `ScopeFor` per level | ✅ | `model/model.go` (commit `9ea813d`) |
+| D-188 | Pemetaan peran app lama → level (`ANGGOTA`→1, `ADMIN KECAMATAN`/`TARBIYAH KECAMATAN`→2, `ADMIN PTD`/`SYSTEM ADMIN`/`ADMIN DPD`→3) | ✅ | `store/sheets/users.go:53-71` |
+| D-189 | Fallback akun lama tanpa level → level diturunkan dari `role` | ✅ | `model.User.LevelOrDefault` |
+| D-190 | Rekaman di luar scope dijawab **404** (bukan 403) — cegah kebocoran keberadaan data | ✅ | `canAccess` di `api/api.go` (commit `9ea813d`) |
+| D-191 | `requireDelete`: anggota boleh hapus data sendiri, admin penuh boleh hapus semua, admin kecamatan tidak | 🔧 | `api/api.go` (`requireDelete`) |
+| D-192 | Frontend `canDelete()` + tombol Hapus mengikuti level | 🔧 | `frontend/src/auth.js`, `frontend/src/views/ListView.vue` |
+| D-193 | Test otomatis hak hapus per level | 🔧 | `api/scope_test.go` `TestMemberCanDeleteOnlyItsOwnRecord` (menggantikan `TestOnlyAdminCanDeleteRecord`) |
+| D-194 | Dokumentasi hak hapus | 🔧 | `README.md`, `API_CONTRACT.md`, `ANALISIS_AKSES_DATA.md` §5.3 |
+
+> Item D-191…D-194 sudah ada di working tree dan **belum ter-commit**; setelah
+> commit statusnya menjadi ✅. Test lama `TestOnlyAdminCanDeleteRecord`
+> dihapus karena bertentangan dengan paritas app lama.
 
 ---
 
@@ -270,14 +417,19 @@ Setiap kriteria penerimaan PRD §10 dipetakan ke implementasi dan test.
 
 | Item | Nilai |
 |---|---|
-| Commit terakhir | `3d7d05a` |
-| Remote `main` | `3d7d05a` (selaras dengan lokal) |
-| Working tree | bersih |
+| Commit terakhir | `20ddf68` (update aplikasi) |
+| Remote `main` | belum dicek pada pembaruan ini |
+| Working tree | **belum bersih** — tiga kelompok perubahan:<br>1. **Upload batch Excel (§9.1)** — `backend/internal/api/batch.go`, `backend/internal/api/batch_test.go`, `frontend/src/excel.js`, `frontend/src/components/BatchUpload.vue` (baru), `CreateRekrutmenBatch` di ketiga store, route + `api.uploadBatch()` di frontend, `canUpload()` di `auth.js`.<br>2. **Granularity role (§9.2)** — `requireDelete` di backend (anggota boleh hapus miliknya, admin penuh boleh hapus semua, admin kecamatan tidak) + `canDelete()` di `frontend/src/auth.js` + `ListView.vue`.<br>3. **Ejaan enum warisan (D-195)** — `model.MetodeLama` + `constants.js`. |
 | `go build ./...` | ✅ |
-| `go vet ./...` | ✅ |
-| `go test ./...` | ✅ 5 paket lulus |
-| `npm run build` | ✅ 3.8 s, 140 kB |
+| `go vet ./...` | ✅ bersih |
+| `go test ./...` | ✅ semua paket lulus (termasuk 8 test batch) |
+| `npm run build` | ✅ 5.09 s, 146 kB (SheetJS tidak masuk bundle) |
 | Test regression untuk D-29 | ✅ lulus; terbukti menangkap bug bila fix dibatalkan |
+
+> **Catatan 2026-11-14:** item bertanda 🔧 (§9.1 D-176…D-185 & D-195, §9.2
+> D-191…D-194, D-171) sudah terimplementasi dan teruji, tetapi belum
+> ter-commit. Setelah commit, ubah statusnya menjadi ✅. Item bertanda ⬜
+> tetap belum dikerjakan.
 
 ### Titik kembali kalau terputus
 
@@ -297,12 +449,19 @@ Prioritas dihitung dari (risiko produksi) × (regulatori PRD).
 |---|---|---|
 | 1 | D-82 flag `Secure` + D-87 header keamanan | blocker produksi |
 | 2 | D-84 + D-85 ganti password / hapus default | kredensial default = risiko |
-| 3 | D-97 ekspor/import + verifikasi provider | gap PRD §7 yang eksplisit |
-| 4 | D-91 CI + D-93 test frontend | mencegah regresi |
-| 5 | D-31 + D-32 manajemen pengguna | operasional harian |
-| 6 | D-83 + D-86 rate limit & CORS allow-list | hardening |
-| 7 | D-94 E2E | mengunci kriteria PRD §9 |
-| 8 | D-99 dashboard (post-MVP) | hanya setelah MVP stabil |
+| 3 | D-176 upload batch Excel untuk anggota (§9.1) | backend selesai; UI (D-182) & dokumentasi (D-186) menyusul |
+| 4 | D-97 ekspor/import + verifikasi provider | gap PRD §7 yang eksplisit |
+| 5 | D-91 CI + D-93 test frontend | mencegah regresi |
+| 6 | D-31 + D-32 manajemen pengguna | operasional harian |
+| 7 | D-83 + D-86 rate limit & CORS allow-list | hardening |
+| 8 | D-94 E2E | mengunci kriteria PRD §9 |
+| 9 | D-99 dashboard (post-MVP) | hanya setelah MVP stabil |
+
+> **Housekeeping:** item bertanda 🔧 (D-171, D-176…D-185, D-191…D-194) sudah
+> teruji dan sebaiknya **dicommit lebih dulu** — setelah itu statusnya menjadi
+> ✅ dan §11 tidak lagi menyebut working tree yang belum bersih.
+
+> Keputusan K-1…K-6 di §9.1.3 **sudah diambil** dan diterapkan di kode.
 
 ---
 

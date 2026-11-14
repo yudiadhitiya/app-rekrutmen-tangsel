@@ -76,7 +76,11 @@ export async function request(path, { method = 'GET', body, query } = {}) {
     }
     const message = (data && data.error) || defaultMessage(response.status)
     const fields = (data && data.fields) || {}
-    throw new ApiError(message, response.status, fields)
+    const err = new ApiError(message, response.status, fields)
+    // The whole answer is kept, so a caller can read the details of a
+    // failed batch upload.
+    err.details = data
+    throw err
   }
 
   return data
@@ -105,6 +109,7 @@ export const api = {
     list: (query) => request('/rekrutmen', { query }),
     get: (id) => request(`/rekrutmen/${encodeURIComponent(id)}`),
     create: (body) => request('/rekrutmen', { method: 'POST', body }),
+    uploadBatch: (rows) => request('/rekrutmen/batch', { method: 'POST', body: rows }),
     update: (id, body) => request(`/rekrutmen/${encodeURIComponent(id)}`, { method: 'PUT', body }),
     remove: (id) => request(`/rekrutmen/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     checkWa: (no) => request('/rekrutmen/check-wa', { query: { no } })

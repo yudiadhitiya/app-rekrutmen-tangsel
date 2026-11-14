@@ -2,16 +2,20 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
-import { isFullAdmin, isMemberOnly } from '../auth'
+import { canDelete, canUpload, isMemberOnly } from '../auth'
 import { METODE, STATUS, tingkatTone, statusTone, normalizeMetode } from '../constants'
 import { toast } from '../toast'
 import { confirmDialog } from '../confirm'
+import BatchUpload from '../components/BatchUpload.vue'
 
 const router = useRouter()
 
-// Only a full administrator may delete a record; the others see and edit
-// the records within their own scope.
-const admin = computed(() => isFullAdmin())
+// A member may delete the records it created itself; a full administrator
+// may delete any record. A district administrator may not delete.
+const canDeleteRecord = computed(() => canDelete())
+
+// Only a member may upload a batch of records.
+const mayUpload = computed(() => canUpload())
 
 const rows = ref([])
 const total = ref(0)
@@ -197,6 +201,8 @@ onMounted(() => {
     </div>
 
     <div class="stack">
+      <BatchUpload v-if="mayUpload" @uploaded="loadRows" />
+
       <div class="card">
         <div class="card__header">
           <h2 class="card__title">Pencarian &amp; Filter</h2>
@@ -317,7 +323,7 @@ onMounted(() => {
                     <div class="data-table__actions">
                       <button class="btn btn--secondary btn--sm" type="button" @click="editRecord(row)">Ubah</button>
                       <button
-                        v-if="admin"
+                        v-if="canDeleteRecord"
                         class="btn btn--danger-soft btn--sm"
                         type="button"
                         :disabled="deletingId === row.id"
@@ -371,7 +377,7 @@ onMounted(() => {
               <div class="recruiter-card__actions">
                 <button class="btn btn--secondary btn--sm" type="button" @click="editRecord(row)">Ubah</button>
                 <button
-                  v-if="admin"
+                  v-if="canDeleteRecord"
                   class="btn btn--danger-soft btn--sm"
                   type="button"
                   :disabled="deletingId === row.id"

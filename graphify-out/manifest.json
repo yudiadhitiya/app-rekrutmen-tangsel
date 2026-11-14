@@ -30,9 +30,9 @@
     "semantic_hash": ""
   },
   "backend/internal/api/api.go": {
-    "mtime": 1794485972.6745248,
-    "seen": 1794493554.9196184,
-    "ast_hash": "5773dd39e6c13fb6443fe679a06177f8",
+    "mtime": 1794606853.0530827,
+    "seen": 1794607097.3716412,
+    "ast_hash": "43f66ca8a838a0a6de0bb580de5015c8",
     "semantic_hash": ""
   },
   "backend/internal/api/api_test.go": {
@@ -174,9 +174,9 @@
     "semantic_hash": ""
   },
   "frontend/src/auth.js": {
-    "mtime": 1794493076.9980955,
-    "seen": 1794493554.9468021,
-    "ast_hash": "02ee97fa25537eb9af8b3ddc3fd27f62",
+    "mtime": 1794606859.1130826,
+    "seen": 1794607097.4144127,
+    "ast_hash": "a1d590f5813f6d1cf6c003c1a2a49a30",
     "semantic_hash": ""
   },
   "frontend/src/components/ConfirmDialog.vue": {
@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "frontend/src/views/ListView.vue": {
-    "mtime": 1794493101.1620955,
-    "seen": 1794493554.95166,
-    "ast_hash": "d8759cfd4f4d66f8c10f2efb2724ccbc",
+    "mtime": 1794606902.6090827,
+    "seen": 1794607097.423786,
+    "ast_hash": "b349d7b56478e53bfea8379a1f7519fb",
     "semantic_hash": ""
   },
   "frontend/src/views/LoginView.vue": {
@@ -258,9 +258,9 @@
     "semantic_hash": ""
   },
   "API_CONTRACT.md": {
-    "mtime": 1794493037.3580956,
-    "seen": 1794493554.9564838,
-    "ast_hash": "f3a73616d6a8bf050c0c006286a8bcc4",
+    "mtime": 1794606974.5610826,
+    "seen": 1794607097.430305,
+    "ast_hash": "e374e7bf363c7c56d7529f0f3dc3d687",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1794556297.5859413,
-    "seen": 1794556354.5715213,
-    "ast_hash": "19c9a7b2b8f37a66bb19cf2f0acc4004",
+    "mtime": 1794606980.6770825,
+    "seen": 1794607097.4329963,
+    "ast_hash": "edb5f7062885841a9cfa488482a91190",
     "semantic_hash": ""
   },
   "SHEETS_INTEGRATION_PLAN.md": {
@@ -570,9 +570,9 @@
     "semantic_hash": ""
   },
   "backend/internal/api/scope_test.go": {
-    "mtime": 1794493131.1780956,
-    "seen": 1794493554.922767,
-    "ast_hash": "ffea1a2c52fa26a29d3ee73ea6b121da",
+    "mtime": 1794606916.9490826,
+    "seen": 1794607097.375168,
+    "ast_hash": "181f17039c4f1b8c227aaaf1ac96894c",
     "semantic_hash": ""
   },
   ".claude/skills/ui-ux-pro-max/SKILL.md": {
@@ -594,9 +594,9 @@
     "semantic_hash": ""
   },
   "ANALISIS_AKSES_DATA.md": {
-    "mtime": 1794493265.4100955,
-    "seen": 1794493554.9564774,
-    "ast_hash": "97df2e1b48321d7b37e6855ba889380a",
+    "mtime": 1794606971.7570827,
+    "seen": 1794607097.4302988,
+    "ast_hash": "3b960af19ad1e58b6dfec54c87297762",
     "semantic_hash": ""
   },
   "UI_UX_AUDIT.md": {

@@ -35,6 +35,13 @@ type Store interface {
 	// It returns ErrNotFound when no record matches.
 	FindRekrutmenByWA(noWA string) (*model.Rekrutmen, error)
 
+	// CreateRekrutmenBatch stores many records in one call.
+	//
+	// It is used by the batch upload, which writes up to a thousand rows at
+	// once. A provider writes them in as few requests as it can. It returns
+	// ErrDuplicateWA when a number is already known.
+	CreateRekrutmenBatch(records []model.Rekrutmen) error
+
 	// Aktivitas master CRUD.
 	ListAktivitas() ([]model.Aktivitas, error)
 	CreateAktivitas(a *model.Aktivitas) error

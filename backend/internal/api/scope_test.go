@@ -149,22 +149,41 @@ func TestPetugasCannotOpenAnotherAccountRecord(t *testing.T) {
 	}
 }
 
-func TestOnlyAdminCanDeleteRecord(t *testing.T) {
+func TestMemberCanDeleteOnlyItsOwnRecord(t *testing.T) {
 	e := newTestEnv(t)
 
-	e.loginAs("admin", "admin123")
-	var rec model.Rekrutmen
-	if code := e.request(http.MethodPost, "/api/rekrutmen", validBody(), &rec); code != http.StatusCreated {
-		t.Fatalf("create: expected 201, got %d", code)
-	}
-
+	// The member creates a record of its own.
 	e.loginAs("petugas", "petugas123")
-	if code := e.request(http.MethodDelete, "/api/rekrutmen/"+rec.ID, nil, nil); code != http.StatusForbidden {
-		t.Fatalf("delete as petugas: expected 403, got %d", code)
+	own := validBody()
+	own["no_wa"] = "628123456780"
+	var ownRec model.Rekrutmen
+	if code := e.request(http.MethodPost, "/api/rekrutmen", own, &ownRec); code != http.StatusCreated {
+		t.Fatalf("create own record: expected 201, got %d", code)
 	}
 
+	// The full administrator creates another record.
 	e.loginAs("admin", "admin123")
-	if code := e.request(http.MethodDelete, "/api/rekrutmen/"+rec.ID, nil, nil); code != http.StatusOK {
+	other := validBody()
+	other["no_wa"] = "628123456781"
+	var otherRec model.Rekrutmen
+	if code := e.request(http.MethodPost, "/api/rekrutmen", other, &otherRec); code != http.StatusCreated {
+		t.Fatalf("create other record: expected 201, got %d", code)
+	}
+
+	// The member deletes the record it created itself.
+	e.loginAs("petugas", "petugas123")
+	if code := e.request(http.MethodDelete, "/api/rekrutmen/"+ownRec.ID, nil, nil); code != http.StatusOK {
+		t.Fatalf("delete own record as member: expected 200, got %d", code)
+	}
+
+	// The record of another account does not exist for it.
+	if code := e.request(http.MethodDelete, "/api/rekrutmen/"+otherRec.ID, nil, nil); code != http.StatusNotFound {
+		t.Fatalf("delete other record as member: expected 404, got %d", code)
+	}
+
+	// The full administrator deletes any record.
+	e.loginAs("admin", "admin123")
+	if code := e.request(http.MethodDelete, "/api/rekrutmen/"+otherRec.ID, nil, nil); code != http.StatusOK {
 		t.Fatalf("delete as admin: expected 200, got %d", code)
 	}
 }

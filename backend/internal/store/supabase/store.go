@@ -243,6 +243,32 @@ func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
 	return nil
 }
 
+// CreateRekrutmenBatch stores many records in one call.
+//
+// PostgREST accepts a list of rows in one request, so the whole batch costs
+// one call.
+func (s *Store) CreateRekrutmenBatch(records []model.Rekrutmen) error {
+	if len(records) == 0 {
+		return nil
+	}
+	for i := range records {
+		records[i].Metode = model.NormalizeMetode(records[i].Metode)
+	}
+	req, err := s.newRequest(context.Background(), http.MethodPost, "/"+tableRekrutmen, records)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Prefer", "return=representation")
+	var rows []model.Rekrutmen
+	if _, err := s.do(req, &rows); err != nil {
+		if isUniqueViolation(err) {
+			return store.ErrDuplicateWA
+		}
+		return err
+	}
+	return nil
+}
+
 func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 	r.Metode = model.NormalizeMetode(r.Metode)
 	req, err := s.newRequest(context.Background(), http.MethodPatch,

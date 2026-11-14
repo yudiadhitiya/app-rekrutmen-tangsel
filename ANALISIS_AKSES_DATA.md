@@ -138,10 +138,14 @@ Status: **5.1, 5.2, dan 5.3 sudah diimplementasikan** (lihat bagian 7). 5.4–5.
 - Store tetap agnostik terhadap role: store hanya Applying field scope generik, tanpa tahu apa itu admin/anggota.
 
 ### 5.3 Jaga hak hapus seperti lama ✅
-- `requireAdmin` kini memakai **level** (`model.User.IsFullAdmin()` → `level >= 3`), bukan `role`.
-- Endpoint yang terpengaruh: `DELETE /api/rekrutmen/{id}`, master aktivitas (POST/PUT/DELETE), `/api/settings`.
-- Verifikasi perilaku lama (`old-app/code.gs:873-882`): `deleteRecruitment` memakai `requireRole_(me, [ANGGOTA])` + `CREATED_BY` harus sama; `old-app/index.html:839-841` tombol Hapus hanya untuk ANGGOTA. Artinya versi lama sebenarnya **tidak** memberi hak hapus ke admin. Rekomendasi dokumen ("hanya ADMIN PTD/SYSTEM ADMIN") tidak persis sama dengan kode lama, tetapi `level >= 3` sama-sama menutup hapus untuk admin kecamatan dan anggota — dipakai sebagai pendekatan yang lebih ketat.
-- Frontend: `isFullAdmin()` + `isMemberOnly()` + `roleLabel()` di `frontend/src/auth.js`; tombol Hapus, menu Pengaturan, dan form master aktivitas mengikuti level yang sama.
+- Hak hapus mengikuti **level**, bukan `role` saja, dan disamakan dengan aplikasi lama (`old-app/code.gs:873-882`).
+- `DELETE /api/rekrutmen/{id}` memakai `requireDelete` (bukan `requireAdmin`):
+  - **Anggota (level 1)** boleh menghapus **data yang ia input sendiri** — `CREATED_BY` harus sama, dicek lewat `canAccess` (di luar scope → 404).
+  - **Admin penuh (level 3)** boleh menghapus data mana pun.
+  - **Admin kecamatan (level 2)** tidak boleh menghapus, seperti di aplikasi lama.
+- Master aktivitas (POST/PUT/DELETE `/api/aktivitas`) dan `/api/settings` tetap memakai `requireAdmin` (`IsFullAdmin()` → `level >= 3`).
+- Catatan: aplikasi lama hanya memberi hak hapus ke role `ANGGOTA` (`old-app/index.html:896` tombol Hapus hanya untuk ANGGOTA). Versi ini menambah hak hapus untuk admin penuh, dan tidak memberi hak hapus ke admin kecamatan.
+- Frontend: `canDelete()` + `isFullAdmin()` + `isMemberOnly()` + `roleLabel()` di `frontend/src/auth.js`; tombol Hapus memakai `canDelete()`, menu Pengaturan dan form master aktivitas memakai `isFullAdmin()`.
 
 ### 5.4 Migrasi data historis sekali jalan
 Buat importer yang memetakan header lama → field baru:
@@ -197,13 +201,14 @@ Tambahkan ke `FormColumnSpec`: `nama target`, `nama anggota`, `aktifitas`, `upls
 - `model.Filter.Scope` diisi di `api.go` (`handleListRekrutmen`) sehingga scope ikut terhitung dalam `total` (filter diterapkan sebelum pagination di store).
 - `model.MatchScope` dipakai di tiga store (local, sheets, supabase); store tidak tahu apa itu role/level.
 - `canAccess` memakai scope yang sama untuk `GET/PUT/DELETE /api/rekrutmen/{id}`, plus `check-wa` (record di luar scope dilaporkan ada tanpa detail).
-- `requireAdmin` (endpoint master/aktivitas/settings/hapus) berbasis `level` — lihat 5.3.
+- `requireAdmin` (endpoint master/aktivitas/settings) berbasis `level` — lihat 5.3.
 - Test: `model_test.go` (`TestScopeFor`, `TestMatchScope`), `api/scope_test.go` (`TestAdminKecamatanOnlySeesOwnDistrict`, `TestAdminKecamatanCannotOpenAnotherDistrictRecord`).
 
 ### 5.3 — Hak hapus & master data berbasis level
 - `model.User.IsFullAdmin()` → `level >= 3`; dipakai `requireAdmin` di `api.go`.
--- Endpoint yang mengikuti level 3: `DELETE /api/rekrutmen/{id}`, POST/PUT/DELETE `/api/aktivitas`, GET/PUT `/api/settings`.
-- Hapus juga dibatasi scope (`canAccess`) → admin penuh menghapus semua, admin kecamatan tidak boleh menghapus sama sekali.
-- Frontend (`frontend/src/auth.js`): `isFullAdmin()`, `isMemberOnly()`, `roleLabel()` (Admin / Admin Kecamatan / Petugas). Dipakai di `App.vue`, `router.js`, `ListView.vue`, `AktivitasView.vue`.
-- `API_CONTRACT.md` diperbarui: role admin pada endpoint master/hapus → "admin penuh (level 3)".
-- Test: `api/scope_test.go` (`TestAdminKecamatanCannotDeleteOrManageMaster`).
+- Endpoint master/setting mengikuti level 3: POST/PUT/DELETE `/api/aktivitas`, GET/PUT `/api/settings`.
+- Endpoint hapus memakai `requireDelete`: anggota (level 1) menghapus data sendiri, admin penuh (level 3) menghapus semua, admin kecamatan (level 2) tidak boleh menghapus — sesuai aplikasi lama.
+- Hapus juga dibatasi scope (`canAccess`) → anggota hanya bisa menghapus data miliknya; data di luar scope dijawab 404.
+- Frontend (`frontend/src/auth.js`): `canDelete()`, `isFullAdmin()`, `isMemberOnly()`, `roleLabel()` (Admin / Admin Kecamatan / Petugas). Dipakai di `App.vue`, `router.js`, `ListView.vue`, `AktivitasView.vue`.
+- `API_CONTRACT.md` diperbarui: endpoint hapus → "anggota (data sendiri) atau admin penuh (level 3)".
+- Test: `api/scope_test.go` (`TestMemberCanDeleteOnlyItsOwnRecord`, `TestAdminKecamatanCannotDeleteOrManageMaster`).

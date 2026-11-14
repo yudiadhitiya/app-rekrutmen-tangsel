@@ -186,6 +186,33 @@ func (s *Store) CreateRekrutmen(r *model.Rekrutmen) error {
 	return s.save()
 }
 
+// CreateRekrutmenBatch stores many records in one call.
+func (s *Store) CreateRekrutmenBatch(records []model.Rekrutmen) error {
+	if len(records) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// The numbers that are taken: the ones already stored and the ones of
+	// this batch.
+	taken := make(map[string]bool, len(s.state.Rekrutmen)+len(records))
+	for _, existing := range s.state.Rekrutmen {
+		taken[existing.NoWA] = true
+	}
+	for _, r := range records {
+		if taken[r.NoWA] {
+			return store.ErrDuplicateWA
+		}
+		taken[r.NoWA] = true
+	}
+	for _, r := range records {
+		r.Metode = model.NormalizeMetode(r.Metode)
+		s.state.Rekrutmen = append(s.state.Rekrutmen, r)
+	}
+	return s.save()
+}
+
 func (s *Store) UpdateRekrutmen(r *model.Rekrutmen) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

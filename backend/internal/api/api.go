@@ -66,6 +66,9 @@ type Server struct {
 	// registerLimiter counts the self-registration attempts per address.
 	registerLimiter *registerLimiter
 
+	// uploadLimiter counts the batch upload attempts per account.
+	uploadLimiter *uploadLimiter
+
 	// storeFactory builds a provider on demand, so an admin can switch
 	// providers without restarting the process.
 	storeFactory func(provider string) (store.Store, error)
@@ -78,6 +81,7 @@ func New(cfg Config, authMgr *auth.Manager, setStore *settings.Store) (*Server, 
 		auth:            authMgr,
 		settings:        setStore,
 		registerLimiter: newRegisterLimiter(),
+		uploadLimiter:   newUploadLimiter(),
 		storeFactory: func(provider string) (store.Store, error) {
 			switch provider {
 			case settings.ProviderLocal:
@@ -218,6 +222,26 @@ func (s *Server) requireAdmin(next func(http.ResponseWriter, *http.Request, mode
 	})
 }
 
+// requireDelete wraps a handler so it only runs for an account that may
+// delete a record.
+//
+// It follows the previous application: a member deletes the records it
+// created itself, and a full administrator deletes any record. A district
+// administrator may not delete, just as in the previous application.
+//
+// The record itself is checked by the handler, which hides a record outside
+// the scope of the account.
+func (s *Server) requireDelete(next func(http.ResponseWriter, *http.Request, model.User)) http.HandlerFunc {
+	return s.requireAuth(func(w http.ResponseWriter, r *http.Request, user model.User) {
+		switch user.LevelOrDefault() {
+		case model.LevelAnggota, model.LevelAdmin:
+			next(w, r, user)
+		default:
+			writeError(w, http.StatusForbidden, "hanya anggota penginput atau admin penuh yang dapat menghapus data")
+		}
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Routing
 // ---------------------------------------------------------------------------
@@ -249,8 +273,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/rekrutmen/check-wa", s.requireAuth(s.handleCheckWA))
 	mux.HandleFunc("GET /api/rekrutmen/{id}", s.requireAuth(s.handleGetRekrutmen))
 	mux.HandleFunc("POST /api/rekrutmen", s.requireAuth(s.handleCreateRekrutmen))
+	mux.HandleFunc("POST /api/rekrutmen/batch", s.requireUpload(s.handleBatchCreateRekrutmen))
 	mux.HandleFunc("PUT /api/rekrutmen/{id}", s.requireAuth(s.handleUpdateRekrutmen))
-	mux.HandleFunc("DELETE /api/rekrutmen/{id}", s.requireAdmin(s.handleDeleteRekrutmen))
+	mux.HandleFunc("DELETE /api/rekrutmen/{id}", s.requireDelete(s.handleDeleteRekrutmen))
 
 	// Settings.
 	mux.HandleFunc("GET /api/settings", s.requireAdmin(s.handleGetSettings))
