@@ -25,6 +25,9 @@ const (
 	MaxBatchBody = 5 << 20
 	// maxBatchErrors is the number of row errors reported at once.
 	maxBatchErrors = 30
+	// DefaultUploadMaxAttempts is the number of uploads one account may
+	// start in ten minutes.
+	DefaultUploadMaxAttempts = 5
 )
 
 // batchColumn maps a column header of the template to the field of the
@@ -330,23 +333,28 @@ func (s *Server) knownWAs() (map[string]bool, error) {
 // The previous application had no limit, but an upload writes many rows at
 // once, so the number of attempts per account is capped.
 type uploadLimiter struct {
-	mu   sync.Mutex
-	hits map[string][]time.Time
+	mu          sync.Mutex
+	hits        map[string][]time.Time
+	maxAttempts int
 }
 
 // newUploadLimiter builds a limiter that allows a few uploads per account.
-func newUploadLimiter() *uploadLimiter {
-	return &uploadLimiter{hits: map[string][]time.Time{}}
+//
+// The limit can be raised through the configuration, so the end-to-end
+// checks can upload more files in a row.
+func newUploadLimiter(maxAttempts int) *uploadLimiter {
+	if maxAttempts <= 0 {
+		maxAttempts = DefaultUploadMaxAttempts
+	}
+	return &uploadLimiter{hits: map[string][]time.Time{}, maxAttempts: maxAttempts}
 }
 
 // allow reports whether another upload may start.
 //
-// The limit is five uploads in ten minutes.
+// The limit is five uploads in ten minutes, unless the configuration raises
+// the number of attempts.
 func (l *uploadLimiter) allow(key string) bool {
-	const (
-		maxAttempts = 5
-		window      = 10 * time.Minute
-	)
+	const window = 10 * time.Minute
 	now := time.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -357,7 +365,7 @@ func (l *uploadLimiter) allow(key string) bool {
 			kept = append(kept, t)
 		}
 	}
-	if len(kept) >= maxAttempts {
+	if len(kept) >= l.maxAttempts {
 		l.hits[key] = kept
 		return false
 	}

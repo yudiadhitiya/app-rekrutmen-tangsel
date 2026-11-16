@@ -95,6 +95,18 @@ func Aktivitas(nama string) Fields {
 	return f
 }
 
+// MinPasswordLength is the shortest password that is accepted.
+const MinPasswordLength = 6
+
+// Password validates a new password.
+func Password(password string) Fields {
+	f := Fields{}
+	if len(strings.TrimSpace(password)) < MinPasswordLength {
+		f["password"] = fmt.Sprintf("password minimal %d karakter", MinPasswordLength)
+	}
+	return f
+}
+
 func contains(list []string, v string) bool {
 	for _, item := range list {
 		if item == v {

@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -52,6 +51,10 @@ type Config struct {
 	//
 	// An empty value means "upgrade".
 	LegacyAuthMode string
+
+	// UploadMaxAttempts is the number of batch uploads one account may
+	// start in ten minutes. Zero means the default of five.
+	UploadMaxAttempts int
 }
 
 // Server holds the HTTP handlers and the active storage provider.
@@ -81,7 +84,7 @@ func New(cfg Config, authMgr *auth.Manager, setStore *settings.Store) (*Server, 
 		auth:            authMgr,
 		settings:        setStore,
 		registerLimiter: newRegisterLimiter(),
-		uploadLimiter:   newUploadLimiter(),
+		uploadLimiter:   newUploadLimiter(cfg.UploadMaxAttempts),
 		storeFactory: func(provider string) (store.Store, error) {
 			switch provider {
 			case settings.ProviderLocal:
@@ -254,6 +257,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/login", s.handleLogin)
 	mux.HandleFunc("POST /api/logout", s.handleLogout)
 	mux.HandleFunc("GET /api/me", s.requireAuth(s.handleMe))
+	mux.HandleFunc("PUT /api/me/password", s.requireAuth(s.handleChangePassword))
 
 	// Self-registration of members.
 	mux.HandleFunc("GET /api/register/options", s.handleRegisterOptions)
@@ -261,6 +265,9 @@ func (s *Server) Handler() http.Handler {
 
 	// Master wilayah.
 	mux.HandleFunc("GET /api/wilayah", s.requireAuth(s.handleWilayah))
+
+	// Dashboard rekapitulasi.
+	mux.HandleFunc("GET /api/dashboard", s.requireAuth(s.handleDashboard))
 
 	// Master aktivitas.
 	mux.HandleFunc("GET /api/aktivitas", s.requireAuth(s.handleListAktivitas))
@@ -270,6 +277,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Rekrutmen.
 	mux.HandleFunc("GET /api/rekrutmen", s.requireAuth(s.handleListRekrutmen))
+	mux.HandleFunc("GET /api/rekrutmen/export", s.requireAuth(s.handleExportRekrutmen))
 	mux.HandleFunc("GET /api/rekrutmen/check-wa", s.requireAuth(s.handleCheckWA))
 	mux.HandleFunc("GET /api/rekrutmen/{id}", s.requireAuth(s.handleGetRekrutmen))
 	mux.HandleFunc("POST /api/rekrutmen", s.requireAuth(s.handleCreateRekrutmen))
@@ -356,6 +364,45 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request, user model.User) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
+}
+
+// handleChangePassword replaces the password of the signed in account.
+//
+// Every account may change its own password, so the access level is not
+// checked. The current password must be given, so a borrowed session cannot
+// take the account over.
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, user model.User) {
+	var body struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "body tidak valid")
+		return
+	}
+	if body.CurrentPassword == "" {
+		writeError(w, http.StatusBadRequest, "password lama wajib diisi")
+		return
+	}
+	if fields := validate.Password(body.NewPassword); len(fields) > 0 {
+		writeFieldError(w, "validasi gagal", fields)
+		return
+	}
+	if body.CurrentPassword == body.NewPassword {
+		writeError(w, http.StatusBadRequest, "password baru harus berbeda dari password lama")
+		return
+	}
+
+	switch err := s.auth.ChangePassword(user.Username, body.CurrentPassword, body.NewPassword); {
+	case errors.Is(err, auth.ErrInvalidCredentials):
+		writeError(w, http.StatusBadRequest, "password lama salah")
+	case errors.Is(err, auth.ErrAccountNotFound):
+		writeError(w, http.StatusNotFound, "akun tidak ditemukan")
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "gagal mengubah password: "+err.Error())
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -480,18 +527,7 @@ func (s *Server) handleDeleteAktivitas(w http.ResponseWriter, r *http.Request, u
 // ---------------------------------------------------------------------------
 
 func (s *Server) handleListRekrutmen(w http.ResponseWriter, r *http.Request, user model.User) {
-	q := r.URL.Query()
-	page, _ := strconv.Atoi(q.Get("page"))
-	limit, _ := strconv.Atoi(q.Get("limit"))
-	f := model.Filter{
-		Q:         q.Get("q"),
-		Kecamatan: q.Get("kecamatan"),
-		Kelurahan: q.Get("kelurahan"),
-		Metode:    model.NormalizeMetode(q.Get("metode")),
-		Status:    q.Get("status"),
-		Page:      page,
-		Limit:     limit,
-	}
+	f := rekrutmenFilterFromQuery(r, user)
 	// The scope of the account decides which records are reachable. It is
 	// part of the filter, so it is applied before the rows are paginated and
 	// the reported total stays correct.

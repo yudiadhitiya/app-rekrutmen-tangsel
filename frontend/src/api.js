@@ -91,12 +91,22 @@ export const api = {
   logout: () => request('/logout', { method: 'POST' }),
   me: () => request('/me'),
 
+  password: {
+    change: (currentPassword, newPassword) =>
+      request('/me/password', {
+        method: 'PUT',
+        body: { current_password: currentPassword, new_password: newPassword }
+      })
+  },
+
   register: {
     options: () => request('/register/options'),
     submit: (body) => request('/register', { method: 'POST', body })
   },
 
   wilayah: () => request('/wilayah'),
+
+  dashboard: (query) => request('/dashboard', { query }),
 
   aktivitas: {
     list: () => request('/aktivitas'),
@@ -112,7 +122,8 @@ export const api = {
     uploadBatch: (rows) => request('/rekrutmen/batch', { method: 'POST', body: rows }),
     update: (id, body) => request(`/rekrutmen/${encodeURIComponent(id)}`, { method: 'PUT', body }),
     remove: (id) => request(`/rekrutmen/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-    checkWa: (no) => request('/rekrutmen/check-wa', { query: { no } })
+    checkWa: (no) => request('/rekrutmen/check-wa', { query: { no } }),
+    exportData: (query) => request('/rekrutmen/export', { query })
   },
 
   settings: {

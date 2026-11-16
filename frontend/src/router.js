@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { auth, loadUser, isFullAdmin } from './auth'
 
 import LoginView from './views/LoginView.vue'
+import DashboardView from './views/DashboardView.vue'
 import ListView from './views/ListView.vue'
 import FormView from './views/FormView.vue'
 import AktivitasView from './views/AktivitasView.vue'
@@ -9,6 +10,7 @@ import SettingsView from './views/SettingsView.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: LoginView, meta: { public: true, title: 'Masuk' } },
+  { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: 'Dashboard' } },
   { path: '/', name: 'list', component: ListView, meta: { title: 'Data Rekrutmen' } },
   { path: '/tambah', name: 'tambah', component: FormView, meta: { title: 'Tambah Rekrutmen' } },
   { path: '/ubah/:id', name: 'ubah', component: FormView, meta: { title: 'Ubah Rekrutmen' } },

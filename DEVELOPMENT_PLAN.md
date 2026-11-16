@@ -111,7 +111,7 @@ Handler: `backend/internal/api/api.go`. Semua 17 route terdaftar di
 | D-29 | **Fix: `PUT` menghapus jejak audit** | ✅ | `api.go:531-545`; regresi test `api_test.go:196` |
 | D-30 | Sinkronisasi frontend↔backend saat field berubah | ✅ | `API_CONTRACT.md` diperbarui bersama kode |
 | D-104 | **Fix: enum `metode` — "Program" + "Antara" → "Program Antara"** | ✅ | `model.go:9` (3 opsi); normalisasi legacy di `validate.go`, ketiga store, dan frontend; regresi test `TestMetodeProgramAntaraIsStoredAndFilterable` |
-| D-31 | Endpoint ganti password | ⬜ | tidak ada; `auth.go` hanya punya verify/hash |
+| D-31 | Endpoint ganti password | ✅ | `PUT /api/me/password` (`api.go`), `auth.Manager.ChangePassword` (`auth.go`); semua role boleh, password lama wajib benar |
 | D-32 | Manajemen pengguna (tambah/hapus petugas) | ⬜ | user hanya dari `auth/users.go` |
 | D-33 | Rate limiting pada `POST /api/login` | ⬜ | lihat D-83 |
 | D-34 | Request ID / logging terstruktur | ⬜ | server pakai `log.Printf` polos |
@@ -194,7 +194,7 @@ Vue 3 + Vue Router + Vite. Sumber: `frontend/src/`.
 | D-81 | RLS Supabase menolak akses `anon` | ✅ | `schema.sql:66-73` |
 | D-82 | **Flag `Secure` pada cookie sesi** | ⬜ | `auth.go:113` & `auth.go:126` — wajib saat HTTPS |
 | D-83 | **Rate limit login (anti brute-force)** | ⬜ | `api.go:251` — endpoint login terbuka |
-| D-84 | **Endpoint ganti password** | ⬜ | lihat D-31 |
+| D-84 | **Endpoint ganti password** | ✅ | lihat D-31 |
 | D-85 | **Hapus password default / paksa ganti saat login pertama** | ⬜ | `auth/users.go:20-22` |
 | D-86 | **CORS allow-list** | ⬜ | `api.go:234` mencerminkan `Origin` apa pun |
 | D-87 | **Header keamanan (CSP, X-Frame-Options, HSTS)** | ⬜ | belum ada middleware |
@@ -226,7 +226,7 @@ Vue 3 + Vue Router + Vite. Sumber: `frontend/src/`.
 |---|---|---|---|
 | D-97 | **Ekspor/import + verifikasi ganti provider** | ⬜ | §7, §10 |
 | D-98 | **Manajemen pengguna (CRUD petugas)** | ⬜ | §2, §9 |
-| D-99 | **Dashboard & laporan analitik** | ⬜ | §11 — *di luar scope MVP*, fase berikutnya |
+| D-99 | **Dashboard & laporan analitik** | ✅ | `internal/api/dashboard.go`, `views/DashboardView.vue` — lihat rencana §14 (D-207…D-215) |
 | D-100 | **Impor massal Excel/CSV** | ⬜ | §11 — *dinaikkan prioritas*, lihat rencana §9.1 (D-176) |
 | D-101 | **Integrasi WhatsApp kirim pesan** | ⬜ | §11 — *di luar scope MVP* |
 | D-102 | **Workflow persetujuan berjenjang** | ⬜ | §11 — *di luar scope MVP* |
@@ -462,6 +462,77 @@ Prioritas dihitung dari (risiko produksi) × (regulatori PRD).
 > ✅ dan §11 tidak lagi menyebut working tree yang belum bersih.
 
 > Keputusan K-1…K-6 di §9.1.3 **sudah diambil** dan diterapkan di kode.
+
+---
+
+## 13. Rencana Task — Unduh Data Rekrutmen (export XLSX)
+
+**Konteks:** aplikasi lama (`old-app/`) sudah punya tombol **Export Excel**
+(`old-app/index.html:326`, server `getRecruitmentsForExport` di
+`old-app/code.gs:884`) yang bisa dipakai **user level 1 (ANGGOTA)** — datanya
+dibatasi ke record miliknya sendiri. Aplikasi baru belum punya fitur ini.
+
+**Keputusan pemilik produk (2026-11-14):**
+
+| # | Keputusan | Alasan |
+|---|---|---|
+| K-7 | Format file **XLSX** | Setara dengan app lama; dibuka langsung di Excel |
+| K-8 | Export **mengikuti filter aktif** (pencarian, kecamatan, kelurahan, metode, status) | File yang diunduh sama dengan yang terlihat di layar |
+| K-9 | Backend mengirim **JSON** (headers + rows), frontend menyusun XLSX dengan SheetJS | Bundle tetap kecil (SheetJS dari CDN, seperti `frontend/src/excel.js`), backend tanpa dependensi baru |
+
+### Daftar task
+
+| # | Task | Status | Verifikasi |
+|---|---|---|---|
+| D-197 | Rencana task tercatat di dokumen ini | ✅ | §13 |
+| D-198 | Endpoint `GET /api/rekrutmen/export` (`requireAuth`, **bukan** `requireAdmin`) | ✅ | `backend/internal/api/export.go` |
+| D-199 | Scope per level: level 1 = data sendiri, level 2 = kecamatannya, level 3 = semua; tanpa paginasi | ✅ | `user.ScopeFor()` + `Limit` besar; `TestExportMemberHoldsOnlyOwnRecords` |
+| D-200 | Format respons JSON: `{headers, rows, total, filename}` | ✅ | `export.go` |
+| D-201 | Klien API `api.rekrutmen.export(filters)` | ✅ | `frontend/src/api.js` |
+| D-202 | Penulis XLSX di frontend + fallback CSV bila SheetJS gagal dimuat | ✅ | `frontend/src/excel.js` `downloadWorkbook()` |
+| D-203 | Tombol "⬇ Unduh Data" di `ListView.vue`, memakai filter aktif | ✅ | `frontend/src/views/ListView.vue` |
+| D-204 | Test backend: scope export per level + apply filter + tanpa paginasi | ✅ | `backend/internal/api/export_test.go` (5 test) |
+| D-205 | Dokumentasi endpoint di `API_CONTRACT.md` | ✅ | § Rekrutmen + § "Unduh data" |
+| D-206 | Build, test, dan `graphify update .` | ✅ | `go test ./...` ✅, `npm run build` ✅ |
+
+> Status item berubah menjadi ✅ setelah diverifikasi lewat kolom **Verifikasi**.
+
+---
+
+## 14. Rencana Task — Dashboard Rekapitulasi (D-99)
+
+**Konteks:** aplikasi lama (`old-app/`) sudah punya halaman dashboard
+rekapitulasi yang dipakai pengelola untuk memantau target pendaftaran. Item
+D-99 tadinya *di luar scope MVP*; sekarang dikerjakan sebagai fase lanjutan.
+
+**Keputusan desain:**
+
+| # | Keputusan | Alasan |
+|---|---|---|
+| K-8 | Endpoint mengembalikan **agregat saja**, tidak pernah record tunggal | Dashboard tidak boleh jadi jalan masuk ke data akun lain |
+| K-9 | Cakupan mengikuti **level** akun: level 3 = semua, level 2 = kecamatannya, level 1 = filter yang dipilih | Konsisten dengan list dan export |
+| K-10 | Anggota (level 1) boleh memilih cakupan: `ALL` / `KECAMATAN` / `ANGGOTA` | Sama seperti aplikasi lama |
+| K-11 | `kecamatanSummary` selalu memuat 7 kecamatan, walau kosong | Panel tetap rapi saat data sedikit |
+
+### Daftar task
+
+| # | Task | Status | Verifikasi |
+|---|---|---|---|
+| D-207 | Endpoint `GET /api/dashboard` (`requireAuth`) | ✅ | `backend/internal/api/dashboard.go` |
+| D-208 | Agregat: total, metode, metode×status, tingkat penerimaan, status, per kecamatan, top 10 nama | ✅ | `buildDashboard()` |
+| D-209 | Scope per level + filter anggota | ✅ | `dashboardRowAllowed()`, `TestDashboard…` |
+| D-210 | Halaman `DashboardView.vue` + menu navigasi + route `/dashboard` | ✅ | `frontend/src/views/DashboardView.vue` |
+| D-211 | Klien API `api.dashboard(query)` | ✅ | `frontend/src/api.js` |
+| D-212 | Gaya kartu/panel dashboard | ✅ | `frontend/src/style.css` (`.dash-*`) |
+| D-213 | Test backend: scope per level, ringkasan metode, tanpa sesi | ✅ | `backend/internal/api/dashboard_test.go` (5 test) |
+| D-214 | Test E2E: panel, cakupan admin penuh, filter anggota, cakupan admin kecamatan | ✅ | `tests/e2e/dashboard.spec.ts` (4 test) |
+| D-215 | Dokumentasi endpoint di `API_CONTRACT.md` + fitur di `README.md` | ✅ | § Dashboard |
+| D-216 | Perbaikan upload massal: `api.rekrutmen.uploadBatch` (pemanggilan salah) | ✅ | `frontend/src/components/BatchUpload.vue` |
+| D-217 | Batas upload dapat dikonfigurasi lewat `UPLOAD_MAX_ATTEMPTS` | ✅ | `backend/internal/api/batch.go`, `cmd/server/main.go` |
+| D-218 | Akun uji lengkap untuk E2E (`petugas`, `admin`, `pw*`) | ✅ | `backend/cmd/e2eseed/main.go` |
+| D-219 | Test backend batas upload (429 setelah batas) | ✅ | `TestBatchStopsAfterTooManyUploads` |
+
+> Status item berubah menjadi ✅ setelah diverifikasi lewat kolom **Verifikasi**.
 
 ---
 

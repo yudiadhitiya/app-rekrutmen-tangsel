@@ -30,22 +30,25 @@ menuntut test baru akan dicatat di bagian [5. Matriks Coverage](#5-matriks-cover
 
 | Lapisan | Sudah ada & lulus | Belum ada | Total | Catatan |
 |---|---|---|---|---|
-| Unit — validasi | 15 | 0 | 15 | coverage 81.4% |
-| Integrasi — API | 18 | 0 | 18 | coverage 63.1% |
-| Integrasi — store local | 14 | 0 | 14 | coverage 86.9% |
-| Integrasi — store sheets | 6 | 0 | 6 | coverage 78.8% |
-| Integrasi — store supabase | 5 | 0 | 5 | coverage 51.4% |
-| Unit — auth / settings / seed / model | 0 | 4 | 4 | **0% coverage, tanpa test file** |
+| Unit — validasi | 15 | 0 | 15 | coverage 76.2% |
+| Integrasi — API | 69 | 0 | 69 | coverage 73.4% |
+| Integrasi — store local | 14 | 0 | 14 | coverage 78.8% |
+| Integrasi — store sheets | 35 | 0 | 35 | coverage 69.5% |
+| Integrasi — store supabase | 5 | 0 | 5 | coverage 47.4% |
+| Unit — auth / model | 20 | 0 | 20 | auth 61.6% · model 53.3% |
+| Unit — settings / seed | 0 | 2 | 2 | **0% coverage, tanpa test file** |
 | Unit — frontend | 0 | 2 | 2 | **tidak ada test runner** |
-| E2E + responsif + a11y | 0 | 4 | 4 | belum ada |
+| E2E Playwright | 20 | 2 | 22 | upload, dashboard, ubah password, browser |
+| E2E responsif + a11y | 0 | 2 | 2 | belum ada |
 | Integrasi provider sungguhan | 0 | 2 | 2 | mock `httptest` saja |
 | Keamanan | 0 | 3 | 3 | cookie `Secure`, rate limit, batas `limit` |
-| Lainnya (kontrak, ekspor/impor, migrasi, performa, beban, browser, restore) | 0 | 7 | 7 | lihat §6 |
-| **Total** | **58** | **22** | **80** | |
+| Lainnya (kontrak, ekspor/impor, migrasi, performa, beban, restore) | 0 | 6 | 6 | lihat §6 |
+| **Total** | **178** | **19** | **197** | |
 
-Kondisi sekarang: **semua test yang ada lulus** (`go test ./...` → 5 paket ok,
-`npm run build` → sukses). Yang belum ada: test frontend, E2E, dan unit test
-untuk tiga paket backend yang benar-benar 0%.
+Kondisi sekarang: **semua test yang ada lulus** (`go test ./...` → 8 paket ok,
+164 test Go; `npm run build` → sukses; `npx playwright test` → 20 test E2E
+lulus). Yang belum ada: test frontend (Vitest), responsif, a11y, dan unit
+test untuk dua paket backend yang benar-benar 0%.
 
 ---
 
@@ -69,6 +72,28 @@ go test -count=1 -run TestRekrutmenCRUDLifecycle -v ./internal/api/
 cd ../frontend
 npm ci
 npm run build
+```
+
+### E2E (Playwright)
+
+E2E butuh server yang sudah berjalan di `http://localhost:8100`, memakai data
+uji yang terpisah dari `data/` repo.
+
+```bash
+# 1. Seed akun uji (petugas, admin, pwpetugas, pwkec, pwadmin)
+cd backend
+go run ./cmd/e2eseed /tmp/e2e-data
+printf '{"rekrutmen":[],"aktivitas":[]}' > /tmp/e2e-data/rekrutmen.json
+
+# 2. Jalankan server uji
+#    UPLOAD_MAX_ATTEMPTS dinaikkan, sebab batas upload bawaan (5 per 10 menit)
+#    menahan rangkaian test upload.
+APP_ROOT="$(pwd)/.." DATA_DIR=/tmp/e2e-data \
+FRONTEND_DIR="$(pwd)/../frontend/dist" ADDR=:8100 \
+LEGACY_AUTH_MODE=off UPLOAD_MAX_ATTEMPTS=50 go run ./cmd/server
+
+# 3. Jalankan test E2E dari root repo
+npx playwright test
 ```
 
 > `go test` memakai cache. Selalu pakai `-count=1` saat memverifikasi,
@@ -177,6 +202,88 @@ Paket tanpa test file: `cmd/server`, `internal/auth`, `internal/model`,
 | T-57 | `TestSupabaseFindByWhatsApp` | lookup by WA |
 | T-58 | `TestSupabaseAktivitasMaster` | master aktivitas |
 
+### 4.6 Auth & ubah password — `backend/internal/auth/auth_test.go`, `backend/internal/api/password_test.go` (18 test)
+
+| # | Test | Mengunci |
+|---|---|---|
+| T-98 | `TestVerifyLoginUsesLocalAccount` | akun lokal tidak menyentuh sumber warisan |
+| T-99 | `TestChangePasswordUpdatesTheLocalAccount` | hash baru tersimpan di `users.json` |
+| T-100 | `TestChangePasswordRejectsWrongCurrentPassword` | password lama salah → `ErrInvalidCredentials` |
+| T-101 | `TestChangePasswordInSheetOnlyMode` | akun hanya di sheet → password ditulis ke sheet |
+| T-102 | `TestChangePasswordUpdatesBothStores` | akun ada di lokal & sheet → keduanya diperbarui |
+| T-103 | `TestChangePasswordOfUnknownAccount` | akun tak dikenal → `ErrAccountNotFound` |
+| T-104 | `TestChangePasswordNeedsSession` | tanpa sesi → 401 |
+| T-105 | `TestChangePasswordOfEveryLevel` | level 1, 2, 3 boleh mengganti password sendiri |
+| T-106 | `TestChangePasswordRejectsShortPassword` | password < 6 karakter → 400 + `fields.password` |
+| T-107 | `TestChangePasswordRejectsSamePassword` | password baru harus berbeda |
+| T-108 | `TestChangePasswordRejectsBrokenBody` | body rusak → 400 `body tidak valid` |
+| T-109 | `TestChangePasswordKeepsTheSession` | sesi tidak diputus setelah ganti password |
+| T-110 | `TestChangePasswordIsUsedByTheNextLogin` | password baru berlaku, yang lama ditolak |
+| T-111 | `TestChangePasswordUpdatesTheAccountOfThePreviousApplication` | hash baru ikut ditulis ke store warisan |
+
+> Rincian matriks dan hasil eksekusi: [`testing_plan.md`](testing_plan.md).
+
+### 4.7 E2E — `tests/e2e/ubah-password.spec.ts` (7 test)
+
+| # | Test | Mengunci |
+|---|---|---|
+| T-112 | `Tombol Password tersedia untuk semua level akun` | tombol header untuk level 1, 2, 3 |
+| T-113 | `Dialog mengubah password menampilkan tiga field` | form lama/baru/ulang, `type=password` |
+| T-114 | `Konfirmasi password yang tidak sama ditolak di sisi klien` | validasi konfirmasi |
+| T-115 | `Password lama yang salah ditolak oleh server` | pesan `password lama salah` |
+| T-116 | `Password baru terlalu pendek ditolak di sisi klien` | minimal 6 karakter |
+| T-117 | `Dialog bisa ditutup dan isiannya dikosongkan` | Batal → form kosong |
+| T-118 | `Password berhasil diganti dan dipakai untuk masuk lagi` | toast sukses, sesi bertahan, password lama ditolak |
+
+### 4.8 Dashboard — `backend/internal/api/dashboard_test.go` (5 test)
+
+| # | Test | Mengunci |
+|---|---|---|
+| T-119 | `TestDashboardCountsEveryRecordForFullAdmin` | admin penuh menghitung semua record; 7 kecamatan selalu tampil |
+| T-120 | `TestDashboardDistrictAdminOnlyCountsOwnDistrict` | admin kecamatan hanya menghitung kecamatannya |
+| T-121 | `TestDashboardMemberFollowsTheChosenFilter` | anggota mengikuti filter `ALL` / `KECAMATAN` / `ANGGOTA` |
+| T-122 | `TestDashboardMethodSummaryCountsTheStatuses` | rekap metode menghitung berhasil, proses, gagal/pending |
+| T-123 | `TestDashboardRequiresAuthentication` | tanpa sesi → 401 |
+
+### 4.9 E2E Dashboard — `tests/e2e/dashboard.spec.ts` (4 test)
+
+| # | Test | Mengunci |
+|---|---|---|
+| T-124 | `Dashboard terbuka dari navigasi dan menampilkan semua panel` | 4 kartu + 5 panel (penerimaan, status, metode, kecamatan, top 10) |
+| T-125 | `Admin penuh melihat seluruh data pada dashboard` | scope "Seluruh data pendaftaran", data baru masuk ke rekap |
+| T-126 | `Anggota memilih cakupan dashboard sendiri` | filter 3 pilihan; scope berubah sesuai filter |
+| T-127 | `Admin kecamatan hanya melihat kecamatannya` | scope "KECAMATAN Serpong", tanpa pilihan filter |
+
+---
+
+### 4.10 Upload massal — `backend/internal/api/batch_test.go` (10 test)
+
+| # | Test | Mengunci |
+|---|---|---|
+| T-128 | `TestMemberCanUploadBatch` | anggota boleh mengunggah; record milik pengunggah |
+| T-129 | `TestBatchIgnoresTheOwnerColumnsOfTheFile` | kolom pemilik dari file lama diabaikan |
+| T-130 | `TestBatchSavesNothingWhenOneRowIsWrong` | satu baris salah → tidak ada baris tersimpan |
+| T-131 | `TestBatchRejectsTwoRowsWithTheSameNumber` | nomor ganda di satu file ditolak |
+| T-132 | `TestBatchSkipsANumberThatIsAlreadyStored` | nomor terdaftar dilewati dan alasannya dilaporkan |
+| T-133 | `TestBatchIsOnlyForMembers` | admin penuh tidak boleh mengunggah |
+| T-134 | `TestBatchRejectsMoreThanTheAllowedRows` | lebih dari 1.000 baris ditolak |
+| T-135 | `TestBatchStopsAfterTooManyUploads` | batas upload per akun (429 setelah batas) |
+| T-136 | `TestBatchAcceptsTheSpellingsOfThePreviousApplication` | ejaan metode app lama diterima |
+| T-137 | `TestBatchAcceptsTheFieldNamesOfThisApplication` | nama field aplikasi ini diterima |
+
+### 4.11 E2E Upload massal — `tests/e2e/batch-upload.spec.ts` (8 test)
+
+| # | Test | Mengunci |
+|---|---|---|
+| T-138 | `Anggota melihat kartu upload dan bisa mengunduh template` | kartu upload + unduh template |
+| T-139 | `Anggota penuh (level 3) tidak melihat kartu upload` | upload hanya untuk anggota |
+| T-140 | `Upload CSV yang valid menyimpan data dan menampilkan ringkasan` | ringkasan "2 data tersimpan." |
+| T-141 | `Baris yang salah tidak disimpan dan nomor barisnya dilaporkan` | nomor baris dilapor |
+| T-142 | `Nomor yang sama di dalam satu file menggagalkan upload` | duplikat di dalam file |
+| T-143 | `Nomor yang sudah terdaftar dilewati dan dilaporkan` | baris dilewati + sebab |
+| T-144 | `Berkas dengan lebih dari 1.000 baris ditolak di sisi klien` | batas baris di klien |
+| T-145 | `Ejaan metode dari aplikasi lama tetap diterima` | ejaan lama → "Dakwah Fardiyah" |
+
 ---
 
 ## 5. Matriks coverage
@@ -196,9 +303,11 @@ dipulihkan.
 | Master aktivitas | CRUD, cascade, proteksi hapus | ✅ |
 | Filter & paginasi | q, status, filter, page/limit | ✅ |
 | Bentuk respons error | 400 per-field, 401, 403, 404, 409 | ✅ |
+| Upload massal | anggota saja, baris salah, duplikat, batas baris, batas percobaan | ✅ |
 | Penyimpanan | ketiga provider, CRUD + filter | ✅ |
 | Ganti provider | validasi provider, provider tak terpasang | ✅ |
-| Hash password | PBKDF2, salt, timing-equalization | ⬜ |
+| Hash password | PBKDF2, salt, timing-equalization | ✅ |
+| Ubah password | endpoint, 3 level akun, warisan, E2E dialog | ✅ |
 | Session cookie | TTL, tanda tangan, kedaluwarsa | ⬜ |
 | Settings store | persist, load, default, file rusak | ⬜ |
 | Seed wilayah | integritas 7/54, waliRT | ⬜ |
@@ -216,13 +325,13 @@ dipulihkan.
 
 | # | Item | Status | Detail |
 |---|---|---|---|
-| T-59 | **Unit test `internal/auth`** | ⬜ | `HashPassword`, `VerifyPassword` (user ada/tidak, password benar/salah), `RandomSecret`, parsing `users.json` |
+| T-59 | **Unit test `internal/auth`** | ✅ (sebagian) | `HashPassword`, `VerifyPassword`, `RandomSecret`, `users.json`, `ChangePassword` (T-98…T-103) |
 | T-60 | **Unit test `internal/settings`** | ⬜ | default `local`, persist, load, file JSON rusak |
 | T-61 | **Unit test `internal/seed`** | ⬜ | integritas 7 kecamatan/54 kelurahan, tidak ada kelurahan tanpa kecamatan |
 | T-62 | **Unit test `internal/model`** | ⬜ | serialisasi JSON, field audit |
 | T-63 | **Test runner frontend** | ⬜ | pasang Vitest + `@vue/test-utils` |
 | T-64 | **Test unit komponen frontend** | ⬜ | `FormView` validasi, `ListView` filter, guard router |
-| T-65 | **Test E2E (Playwright)** | ⬜ | alur PRD §5 end-to-end |
+| T-65 | **Test E2E (Playwright)** | ✅ (sebagian) | alur ubah password (T-112…T-118) dan dashboard (T-124…T-127); alur PRD §5 menyusul |
 | T-66 | **Test E2E peran** | ⬜ | petugas tidak bisa masuk menu admin |
 | T-67 | **Test responsif** | ⬜ | viewport mobile, tabel→kartu |
 | T-68 | **Audit a11y** | ⬜ | axe-core di E2E |
@@ -348,13 +457,17 @@ Checklist yang dijalankan setelah deploy atau sebelum rilis.aty.
 
 | Item | Nilai |
 |---|---|
-| Commit terakhir | `3d7d05a` |
-| `go test ./...` | ✅ 5 paket ok |
-| Coverage | api 63.1% · local 86.5% · sheets 78.7% · supabase 51.8% · validate 81.0% |
+| Commit terakhir | `5acf1c1` (pekerjaan dashboard & upload belum di-commit) |
+| `go test ./...` | ✅ 8 paket ok (164 test Go) |
+| Coverage | api 73.4% · auth 61.6% · local 78.8% · sheets 69.5% · supabase 47.4% · model 53.3% · validate 76.2% |
 | `npm run build` | ✅ sukses |
-| Total test | 58 lulus |
-| Test belum ada | 22 item |
+| `npx playwright test` | ✅ 20 lulus (upload 8, dashboard 4, ubah password 7, browser 1) |
+| Total test | 164 lulus (Go) + 20 E2E Playwright |
+| Test belum ada | 19 item |
 | Test runner frontend | belum ada |
+| Uji fitur ubah password | ✅ selesai 2026-11-16 — lihat [`testing_plan.md`](testing_plan.md) |
+| Uji fitur dashboard | ✅ selesai 2026-11-16 — T-119…T-123 (Go) & T-124…T-127 (E2E) |
+| Uji fitur upload massal | ✅ selesai 2026-11-16 — T-128…T-137 (Go) & T-138…T-145 (E2E) |
 
 ### Titik kembali kalau terputus
 

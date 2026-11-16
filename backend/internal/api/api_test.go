@@ -27,6 +27,30 @@ func newTestEnv(t *testing.T) *testEnv {
 	return newTestEnvWithUsers(t, nil)
 }
 
+// newTestEnvWithUploadLimit starts an environment with a given number of
+// allowed batch uploads, so the limiter can be tested without waiting.
+func newTestEnvWithUploadLimit(t *testing.T, maxAttempts int) *testEnv {
+	t.Helper()
+	dir := t.TempDir()
+	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	setStore, err := settings.NewStore(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, err := New(Config{DataDir: dir, UploadMaxAttempts: maxAttempts}, authMgr, setStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	jar, err := cookieJar()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &testEnv{t: t, server: srv, client: &http.Client{Jar: jar}, base: ts.URL}
+}
+
 // newTestEnvWithUsers starts an environment with the default accounts plus
 // the given ones, so a test can act as an account of a specific access level.
 func newTestEnvWithUsers(t *testing.T, extra []auth.User) *testEnv {

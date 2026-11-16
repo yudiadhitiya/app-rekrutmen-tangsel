@@ -38,6 +38,9 @@ var ErrInvalidCredentials = errors.New("username atau password salah")
 // configured, so a self-registration cannot be written anywhere.
 var ErrNoRegistrar = errors.New("pendaftaran anggota belum tersedia")
 
+// ErrAccountNotFound is returned when the account is not known to any store.
+var ErrAccountNotFound = errors.New("akun tidak ditemukan")
+
 // LegacyAuthenticator verifies credentials against an external account store,
 // such as the USERS sheet of the previous application.
 //
@@ -58,6 +61,18 @@ type LegacyLookup interface {
 	// LookupLegacy returns the account as it is known to the previous
 	// application.
 	LookupLegacy(username string) (model.User, bool, error)
+}
+
+// LegacyPasswordSetter changes the password of an account of the previous
+// application.
+//
+// It is implemented by the account store of the previous application, so a
+// user keeps one password for both applications.
+type LegacyPasswordSetter interface {
+	// SetLegacyPassword stores a new password for the account.
+	//
+	// It reports whether the account is known to the store.
+	SetLegacyPassword(username, password string) (bool, error)
 }
 
 // Registrar creates a new account in an external account store, such as the
@@ -401,6 +416,94 @@ func (m *Manager) VerifyPassword(username, password string) (model.User, error) 
 		return model.User{}, err
 	}
 	return u.User, nil
+}
+
+// ChangePassword replaces the password of an account.
+//
+// The current password must be given, so a stolen session alone cannot take
+// the account over. The new password is written to the local account store
+// and, when the account also exists in the account store of the previous
+// application, there too. One password then works in both applications.
+//
+// Every account may change its own password; the access level does not matter.
+func (m *Manager) ChangePassword(username, current, next string) error {
+	key := strings.ToLower(strings.TrimSpace(username))
+	if key == "" {
+		return ErrAccountNotFound
+	}
+
+	m.mu.RLock()
+	u, localExists := m.users[key]
+	legacy := m.legacy
+	m.mu.RUnlock()
+
+	if !localExists && legacy == nil {
+		return ErrAccountNotFound
+	}
+
+	// The current password is checked against every store that knows the
+	// account, because the store that decides a sign in depends on the mode.
+	verified := false
+	if localExists {
+		if err := m.verifyStored(u, current); err == nil {
+			verified = true
+		}
+	}
+	if !verified && legacy != nil {
+		_, valid, err := legacy.VerifyLegacy(username, current)
+		if err != nil {
+			return err
+		}
+		verified = valid
+	}
+	if !verified {
+		return ErrInvalidCredentials
+	}
+
+	if localExists {
+		salt, hash, err := HashPassword(next)
+		if err != nil {
+			return err
+		}
+		m.mu.Lock()
+		u.PasswordHash = hash
+		u.Salt = salt
+		m.users[key] = u
+		m.mu.Unlock()
+		if err := m.saveAll(); err != nil {
+			return err
+		}
+	}
+
+	// The account of the previous application keeps the same password, so the
+	// user does not have to remember two of them.
+	if setter, ok := legacy.(LegacyPasswordSetter); ok {
+		found, err := setter.SetLegacyPassword(username, next)
+		if err != nil {
+			return err
+		}
+		if !found && !localExists {
+			return ErrAccountNotFound
+		}
+	}
+	return nil
+}
+
+// saveAll writes the accounts to the local store.
+func (m *Manager) saveAll() error {
+	m.mu.RLock()
+	path := m.path
+	all := make([]User, 0, len(m.users))
+	for _, item := range m.users {
+		all = append(all, item)
+	}
+	m.mu.RUnlock()
+
+	if path == "" {
+		return nil
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].Username < all[j].Username })
+	return saveUsers(path, all)
 }
 
 // SetSession writes a signed session cookie for the user.

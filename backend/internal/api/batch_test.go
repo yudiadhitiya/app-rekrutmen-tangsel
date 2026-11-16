@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -185,6 +186,22 @@ func TestBatchRejectsMoreThanTheAllowedRows(t *testing.T) {
 	code, _ := e.uploadBatch(rows)
 	if code != http.StatusBadRequest {
 		t.Fatalf("upload: expected 400, got %d", code)
+	}
+}
+
+func TestBatchStopsAfterTooManyUploads(t *testing.T) {
+	e := newTestEnvWithUploadLimit(t, 2)
+
+	e.loginAs("petugas", "petugas123")
+	for i := 0; i < 2; i++ {
+		rows := []map[string]string{uploadRow("Ahmad Fauzi", fmt.Sprintf("62812345679%d", i))}
+		if code, out := e.uploadBatch(rows); code != http.StatusCreated {
+			t.Fatalf("upload %d: expected 201, got %d (%v)", i, code, out)
+		}
+	}
+	code, _ := e.uploadBatch([]map[string]string{uploadRow("Ahmad Fauzi", "628123456792")})
+	if code != http.StatusTooManyRequests {
+		t.Fatalf("upload after the limit: expected 429, got %d", code)
 	}
 }
 

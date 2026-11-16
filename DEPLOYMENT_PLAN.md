@@ -121,6 +121,7 @@ Prinsip:
 | `GOOGLE_SHEETS_TAB_PENGGUNA` | `USERS` | tidak | nama tab akun aplikasi lama |
 | `LEGACY_AUTH_MODE` | `upgrade` | tidak | `upgrade`, `sheet`, atau `off` |
 | `APP_ROOT` | `.` | ya | root aplikasi untuk path relatif |
+| `UPLOAD_MAX_ATTEMPTS` | `5` | tidak | jumlah upload massal per akun per 10 menit |
 
 ---
 

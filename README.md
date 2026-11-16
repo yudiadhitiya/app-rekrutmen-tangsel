@@ -22,15 +22,26 @@ kemajuan yang sudah aman.
 
 ## Fitur
 
+- Dashboard rekapitulasi: total target, rekap per metode pendaftaran, status,
+  tingkat penerimaan, ringkasan per kecamatan, dan 10 nama teratas. Cakupannya
+  mengikuti level akun; anggota dapat memilih cakupan sendiri.
 - Form tambah / ubah data rekrutmen dengan validasi di frontend dan backend.
 - Daftar data dengan pencarian (nama / nomor WhatsApp) dan filter kecamatan,
   kelurahan, metode, serta status.
 - Hapus data dengan konfirmasi.
+- Unduh data rekrutmen ke file XLSX, mengikuti filter yang aktif dan dibatasi
+  oleh level akun (user level 1 hanya mengunduh data miliknya sendiri).
 - Master wilayah (7 kecamatan, 54 kelurahan) dan master aktivitas/pekerjaan
   yang dapat dikelola admin.
+- Upload data massal dari berkas CSV (anggota): template template aplikasi lama
+  tetap diterima, baris yang salah dilaporkan per nomor baris, dan nomor yang
+  sudah terdaftar dilewati.
 - Pilihan sumber penyimpanan: **Supabase**, **Google Sheets**, atau penyimpanan
   lokal, dapat diganti admin lewat menu Pengaturan.
 - Autentikasi berbasis peran (admin / petugas).
+- Semua akun dapat mengganti passwordnya sendiri lewat tombol "Password" di
+  header; password baru berlaku juga di aplikasi lama bila akunnya ada di tab
+  `USERS`.
 - Tampilan tabel pada layar lebar dan kartu pada layar sempit.
 
 ## Stack
@@ -74,6 +85,7 @@ Environment (opsional):
 | `GOOGLE_SHEETS_TAB_SUMBER`    | nama tab sumber untuk impor, default `Form Responses 1` |
 | `GOOGLE_SHEETS_TAB_PENGGUNA`  | nama tab akun app lama, default `USERS` |
 | `LEGACY_AUTH_MODE`            | `upgrade` (default), `sheet`, atau `off` — cara memakai akun app lama |
+| `UPLOAD_MAX_ATTEMPTS`         | jumlah upload massal per akun per 10 menit, default `5` |
 
 Backend membaca konfigurasi langsung dari environment; tidak ada file `.env`
 yang dimuat otomatis. Untuk pengembangan, ekspor variabelnya di shell:

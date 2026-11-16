@@ -224,3 +224,34 @@ export function downloadTemplate() {
   link.remove()
   URL.revokeObjectURL(url)
 }
+
+// downloadWorkbook writes the cells as an Excel file.
+//
+// The library is loaded from the CDN, like the previous application did. When
+// it cannot be loaded, the file is written as a CSV instead, so a download
+// still succeeds without an internet connection. The answer tells which format
+// was used.
+export async function downloadWorkbook(filename, sheetName, headers, rows) {
+  const cells = [headers, ...rows]
+  try {
+    const XLSX = await loadSheetJS()
+    const ws = XLSX.utils.aoa_to_sheet(cells)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, sheetName)
+    XLSX.writeFile(wb, filename)
+    return 'xlsx'
+  } catch (err) {
+    const name = filename.replace(/\.xlsx$/i, '') + '.csv'
+    const text = '﻿' + toCSV(cells)
+    const blob = new Blob([text], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    return 'csv'
+  }
+}

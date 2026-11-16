@@ -293,3 +293,117 @@ func TestSheetOnlyFallsBackToAccountUnknownToTheStore(t *testing.T) {
 		t.Errorf("user: %+v", user)
 	}
 }
+
+// fakePasswordLegacy stands in for the account store of the previous
+// application that can also store a new password.
+type fakePasswordLegacy struct {
+	fakeLegacy
+	password string
+	found    bool
+	err      error
+}
+
+func (f *fakePasswordLegacy) SetLegacyPassword(username, password string) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	if !f.found {
+		return false, nil
+	}
+	f.password = password
+	return true, nil
+}
+
+func TestChangePasswordUpdatesTheLocalAccount(t *testing.T) {
+	m := testManager(t)
+
+	if err := m.ChangePassword("admin", "admin123", "rahasia456"); err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if _, _, err := m.VerifyLogin("admin", "rahasia456"); err != nil {
+		t.Fatalf("login dengan password baru: %v", err)
+	}
+	if _, _, err := m.VerifyLogin("admin", "admin123"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("password lama harus ditolak, dapat %v", err)
+	}
+
+	// The new hash is written to the local store, so it survives a restart.
+	users, err := loadUsers(m.path)
+	if err != nil {
+		t.Fatalf("loadUsers: %v", err)
+	}
+	if err := m.verifyStored(users[0], "rahasia456"); err != nil {
+		t.Errorf("hash tersimpan tidak cocok: %v", err)
+	}
+}
+
+func TestChangePasswordRejectsWrongCurrentPassword(t *testing.T) {
+	m := testManager(t)
+
+	if err := m.ChangePassword("admin", "salah", "rahasia456"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("harus ErrInvalidCredentials, dapat %v", err)
+	}
+	if _, _, err := m.VerifyLogin("admin", "admin123"); err != nil {
+		t.Fatalf("password lama harus tetap berlaku: %v", err)
+	}
+}
+
+func TestChangePasswordUpdatesTheAccountOfThePreviousApplication(t *testing.T) {
+	m := testManager(t)
+	legacy := &fakePasswordLegacy{
+		fakeLegacy: fakeLegacy{ok: true, user: model.User{ID: "u1", Username: "anggota01"}},
+		found:      true,
+	}
+	m.SetLegacyAuthenticator(legacy)
+
+	if err := m.ChangePassword("anggota01", "lama", "baru123"); err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if legacy.password != "baru123" {
+		t.Errorf("password warisan: %q", legacy.password)
+	}
+}
+
+func TestChangePasswordOfUnknownAccount(t *testing.T) {
+	m := testManager(t)
+
+	if err := m.ChangePassword("entah", "lama", "baru123"); !errors.Is(err, ErrAccountNotFound) {
+		t.Fatalf("harus ErrAccountNotFound, dapat %v", err)
+	}
+}
+
+func TestChangePasswordInSheetOnlyMode(t *testing.T) {
+	m := testManager(t)
+	legacy := &fakePasswordLegacy{
+		fakeLegacy: fakeLegacy{ok: true, user: model.User{ID: "u1", Username: "anggota01"}},
+		found:      true,
+	}
+	m.SetLegacyAuthenticator(legacy)
+	m.SetSheetOnly(true)
+
+	if err := m.ChangePassword("anggota01", "lama", "baru123"); err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if legacy.password != "baru123" {
+		t.Errorf("password warisan: %q", legacy.password)
+	}
+}
+
+func TestChangePasswordUpdatesBothStores(t *testing.T) {
+	m := testManager(t)
+	legacy := &fakePasswordLegacy{
+		fakeLegacy: fakeLegacy{ok: true, user: model.User{ID: "u1", Username: "admin"}},
+		found:      true,
+	}
+	m.SetLegacyAuthenticator(legacy)
+
+	if err := m.ChangePassword("admin", "admin123", "baru123"); err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if legacy.password != "baru123" {
+		t.Errorf("password warisan: %q", legacy.password)
+	}
+	if _, _, err := m.VerifyLogin("admin", "baru123"); err != nil {
+		t.Errorf("salinan lokal harus ikut berubah: %v", err)
+	}
+}

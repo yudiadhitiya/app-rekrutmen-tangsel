@@ -157,6 +157,47 @@ func (s *Store) LookupLegacy(username string) (model.User, bool, error) {
 	}, true, nil
 }
 
+// SetLegacyPassword stores a new password for an account of the previous
+// application.
+//
+// The password is stored the way the previous application stores it: an
+// unsalted SHA-256 hash. It reports whether the account is known to the tab,
+// so an account that only lives in the local store is left alone.
+func (s *Store) SetLegacyPassword(username, password string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), registerTimeout)
+	defer cancel()
+
+	headers, rows, err := s.readTab(ctx, s.tabPengguna)
+	if err != nil {
+		return false, fmt.Errorf("google sheets: baca tab pengguna: %w", err)
+	}
+	idxUsername := indexOfHeader(headers, colUsername)
+	idxHash := indexOfHeader(headers, colPasswordHash)
+	if idxUsername < 0 || idxHash < 0 {
+		return false, fmt.Errorf("google sheets: tab %q tidak punya kolom %q dan %q",
+			s.tabPengguna, colUsername, colPasswordHash)
+	}
+
+	want := strings.ToLower(strings.TrimSpace(username))
+	for i, row := range rows {
+		if idxUsername >= len(row) {
+			continue
+		}
+		if strings.ToLower(strings.TrimSpace(row[idxUsername])) != want {
+			continue
+		}
+		values := make([]string, len(headers))
+		copy(values, row)
+		values[idxHash] = sha256Hex(password)
+		// Row 1 is the header, so the first data row is row 2.
+		if err := s.updateRow(ctx, s.tabPengguna, i+2, values); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 // findLegacyUser looks up an account of the previous application by name.
 func (s *Store) findLegacyUser(username string) (LegacyUser, bool, error) {
 	want := strings.ToLower(strings.TrimSpace(username))

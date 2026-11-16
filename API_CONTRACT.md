@@ -11,8 +11,16 @@ Roles: `admin` (everything), `petugas` (CRUD rekrutmen only).
 | POST | `/login` | `{username, password}` | `{user:{id,username,nama,role}}` |
 | POST | `/logout` | — | `{ok:true}` |
 | GET | `/me` | — | `{user:{id,username,nama,role}}` |
+| PUT | `/me/password` | `{current_password, new_password}` | `{ok:true}` |
 
 401 on bad credentials or missing/invalid session.
+
+`PUT /me/password` mengubah password akun yang sedang masuk. Semua role boleh
+mengubah passwordnya sendiri; tidak ada pembatasan level. `current_password`
+wajib benar (400 bila salah), `new_password` minimal 6 karakter dan harus
+berbeda dari password lama (400 bila tidak). Password baru ikut ditulis ke
+tab `USERS` bila akunnya ada di aplikasi sebelumnya, jadi satu password
+berlaku di kedua aplikasi.
 
 ## Master wilayah (read-only, all roles)
 
@@ -26,10 +34,47 @@ Roles: `admin` (everything), `petugas` (CRUD rekrutmen only).
 7 kecamatan (Serpong, Serpong Utara, Pondok Aren, Ciputat, Ciputat Timur,
 Pamulang, Setu), 54 kelurahan total.
 
+## Dashboard
+
+`GET /dashboard` →
+
+Menampilkan rekapitulasi data pendaftaran. Endpoint ini hanya mengembalikan
+**agregat**, tidak pernah satu record pun, jadi tidak bisa dipakai untuk
+mengakses data akun lain.
+
+Query `filter` berlaku untuk anggota (level 1):
+
+| Filter | Arti |
+|---|---|
+| `ALL` (bawaan) | seluruh kecamatan |
+| `KECAMATAN` | hanya kecamatan akun |
+| `ANGGOTA` | hanya record yang dibuat akun itu sendiri |
+
+Cakupan mengikuti level akun: level 3 = seluruh data, level 2 = kecamatannya
+saja, level 1 = mengikuti filter di atas.
+
+```json
+{ "scope": "Seluruh data pendaftaran",
+  "filter": "ALL",
+  "total": 120,
+  "methods": [ {"name":"Halaqoh","total":50,"percent":41.7} ],
+  "methodSummary": [ {"name":"Halaqoh","total":50,"berhasil":30,"proses":15,
+                       "gagalPending":5,"percent":41.7} ],
+  "acceptance": [ {"name":"Terbuka","total":60,"percent":50} ],
+  "status": [ {"name":"Berhasil","total":70,"percent":58.3} ],
+  "statusDetail": [ {"name":"Berhasil","total":70,"percent":58.3} ],
+  "kecamatanSummary": [ {"kecamatan":"Serpong","target":30,"berhasil":20,
+                          "proses":6,"persenBerhasil":66.7,"persenProses":20} ],
+  "top10": [ {"nama":"Ahmad Fauzi","total":3} ] }
+```
+
+`kecamatanSummary` selalu memuat 7 kecamatan Tangsel, walau belum ada data.
+
 ## Master aktivitas (job/activity categories)
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
+| GET | `/dashboard` | any | rekapitulasi data (agregat, tanpa paginasi) — query `filter` |
 | GET | `/aktivitas` | any | `[{id,nama,aktif}]` sorted by nama |
 | POST | `/aktivitas` | admin penuh (level 3) | `{nama}` → created |
 | PUT | `/aktivitas/:id` | admin penuh (level 3) | `{nama, aktif}` |
@@ -45,6 +90,8 @@ Pamulang, Setu), 54 kelurahan total.
 | PUT | `/rekrutmen/:id` | any | |
 | DELETE | `/rekrutmen/:id` | anggota (data sendiri) atau admin penuh (level 3) | admin kecamatan (level 2) → 403 |
 | GET | `/rekrutmen/check-wa?no=628123` | any | `{exists:bool, id?:string}` — warn-before-save check |
+| GET | `/rekrutmen/export` | any | unduh data — query filter sama seperti `/rekrutmen` (tanpa paginasi); dibatasi scope level |
+| POST | `/rekrutmen/batch` | anggota (level 1) | upload massal — array baris; lihat § Upload massal |
 
 `GET /rekrutmen` →
 ```json
@@ -78,6 +125,55 @@ Enums:
 - `metode`: `Halaqoh` | `Program Antara` | `Dakwah Fardiyah`
 - `status`: `Berhasil` | `Proses` | `Pending` | `Gagal`
 - `upl`: `""` | `UPLS` | `UPLM`
+
+### Unduh data (`GET /rekrutmen/export`)
+
+Mengembalikan baris siap unduh (bukan paginasi), mengikuti filter yang
+dikirim. Cakupan data ditentukan oleh **level** akun, sama seperti list:
+
+| Level | Cakupan export |
+|---|---|
+| 1 (anggota) | hanya record yang dibuat sendiri |
+| 2 (admin kecamatan) | hanya record kecamatannya |
+| 3 (admin penuh) | semua record |
+
+```json
+{ "headers": ["NAMA ANGGOTA", "NAMA TARGET", "..."],
+  "rows": [["petugas", "Ahmad Fauzi", "628123456789", "..."]],
+  "total": 1,
+  "filename": "Data_Rekrutmen_Tangsel_20261114_101500.xlsx" }
+```
+
+Frontend menyusun file XLSX dari `headers` + `rows` (SheetJS, dimuat dari
+CDN). Bila pustaka tidak termuat, file diunduh sebagai CSV.
+
+### Upload massal (`POST /rekrutmen/batch`)
+
+Hanya untuk **anggota** (level 1). Body berisi array baris, masing-masing
+satu objek dengan nama kolom (nama field aplikasi ini atau header template
+aplikasi lama). Pemilik dan timestamp diambil dari sesi, jadi tidak bisa diisi
+dari file.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| POST | `/rekrutmen/batch` | anggota (level 1) | maks. 1.000 baris, maks. 5 MB |
+
+Berhasil (`201`):
+```json
+{ "created": 2,
+  "skipped": [ { "row": 4, "nama": "Siti Aminah", "no_wa": "628123456780",
+                 "reason": "nomor whatsapp sudah terdaftar" } ] }
+```
+
+Gagal validasi (`400`) — **tidak ada baris yang disimpan**:
+```json
+{ "error": "validasi upload gagal. tidak ada data yang disimpan.",
+  "error_count": 1,
+  "errors": [ { "row": 3, "field": "no_wa", "reason": "hanya boleh angka 0-9" } ] }
+```
+
+Batas percobaan (`429`): satu akun boleh melakukan 5 upload per 10 menit.
+Jumlahnya dapat dinaikkan lewat environment `UPLOAD_MAX_ATTEMPTS`.
 
 ## Settings (admin only)
 
@@ -114,6 +210,7 @@ Enums:
 | Path | View | Access |
 |---|---|---|
 | `/login` | LoginView | public |
+| `/dashboard` | DashboardView | any |
 | `/` | ListView (redirect `/`) | any |
 | `/tambah` | FormView (create) | any |
 | `/ubah/:id` | FormView (edit) | any |

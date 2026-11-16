@@ -7,6 +7,7 @@ import { METODE, STATUS, tingkatTone, statusTone, normalizeMetode } from '../con
 import { toast } from '../toast'
 import { confirmDialog } from '../confirm'
 import BatchUpload from '../components/BatchUpload.vue'
+import { downloadWorkbook } from '../excel'
 
 const router = useRouter()
 
@@ -24,6 +25,7 @@ const limit = ref(25)
 const loading = ref(false)
 const deletingId = ref('')
 const errorMessage = ref('')
+const exporting = ref(false)
 
 const wilayah = ref({ kecamatan: [] })
 const wilayahLoaded = ref(false)
@@ -163,6 +165,36 @@ function editRecord(record) {
   router.push({ path: '/ubah/' + encodeURIComponent(record.id) })
 }
 
+// exportData downloads the records that the screen shows.
+//
+// The download follows the active filter, so the file holds the same records
+// as the list. The server limits the rows to the scope of the account, so a
+// member of level 1 downloads only the records it created itself.
+async function exportData() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const data = await api.rekrutmen.exportData(activeFilters.value)
+    const headers = (data && data.headers) || []
+    const rows = (data && data.rows) || []
+    if (!rows.length) {
+      toast.info('Tidak ada data yang cocok dengan filter untuk diunduh.')
+      return
+    }
+    const filename = (data && data.filename) || 'Data_Rekrutmen_Tangsel.xlsx'
+    const format = await downloadWorkbook(filename, 'PENDAFTARAN', headers, rows)
+    if (format === 'csv') {
+      toast.warning('Pustaka Excel tidak termuat, file diunduh sebagai CSV.')
+    } else {
+      toast.success(`${rows.length} data berhasil diunduh.`)
+    }
+  } catch (err) {
+    toast.error(err.message || 'Gagal mengunduh data rekrutmen.')
+  } finally {
+    exporting.value = false
+  }
+}
+
 async function deleteRecord(record) {
   const confirmed = await confirmDialog({
     title: 'Hapus data rekrutmen?',
@@ -197,7 +229,12 @@ onMounted(() => {
         <h1 class="page-head__title">Data Rekrutmen</h1>
         <p class="page-head__subtitle">Kelola seluruh data rekrutmen wilayah Kota Tangerang Selatan.</p>
       </div>
-      <RouterLink to="/tambah" class="btn btn--primary">+ Tambah Rekrutmen</RouterLink>
+      <div class="page-head__actions">
+        <button class="btn btn--secondary" type="button" :disabled="exporting" @click="exportData">
+          {{ exporting ? 'Menyiapkan file...' : '⬇ Unduh Data' }}
+        </button>
+        <RouterLink to="/tambah" class="btn btn--primary">+ Tambah Rekrutmen</RouterLink>
+      </div>
     </div>
 
     <div class="stack">

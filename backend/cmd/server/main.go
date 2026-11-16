@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"rekrutmen-tangsel/backend/internal/api"
@@ -19,6 +20,21 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// envInt reads a number from the environment, falling back when the value is
+// missing or not a number.
+func envInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		log.Printf("%s bukan angka, memakai %d", key, fallback)
+		return fallback
+	}
+	return n
 }
 
 func main() {
@@ -102,6 +118,7 @@ func main() {
 		GoogleSheetsTabSumber:    os.Getenv("GOOGLE_SHEETS_TAB_SUMBER"),
 		GoogleSheetsTabPengguna:  os.Getenv("GOOGLE_SHEETS_TAB_PENGGUNA"),
 		LegacyAuthMode:           legacyMode,
+		UploadMaxAttempts:       envInt("UPLOAD_MAX_ATTEMPTS", api.DefaultUploadMaxAttempts),
 	}
 
 	srv, err := api.New(cfg, authMgr, setStore)

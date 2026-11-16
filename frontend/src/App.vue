@@ -1,9 +1,10 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { auth, isFullAdmin, roleLabel, logout } from './auth'
 import Toast from './components/Toast.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
+import PasswordDialog from './components/PasswordDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,8 +12,11 @@ const router = useRouter()
 const isPublicPage = computed(() => !!route.meta.public)
 const admin = computed(() => isFullAdmin())
 
+const passwordOpen = ref(false)
+
 const navLinks = computed(() => {
   const links = [
+    { to: '/dashboard', label: 'Dashboard' },
     { to: '/', label: 'Data Rekrutmen' },
     { to: '/tambah', label: 'Tambah' },
     { to: '/aktivitas', label: 'Aktivitas' }
@@ -49,6 +53,7 @@ async function handleLogout() {
             <span class="app-bar__name">{{ auth.user ? auth.user.nama || auth.user.username : '' }}</span>
             <span class="app-bar__role">{{ userRoleLabel }}</span>
           </div>
+          <button class="btn btn--secondary btn--sm" type="button" @click="passwordOpen = true">Password</button>
           <button class="btn btn--secondary btn--sm" type="button" @click="handleLogout">Keluar</button>
         </div>
       </div>
@@ -60,6 +65,7 @@ async function handleLogout() {
 
     <Toast />
     <ConfirmDialog />
+    <PasswordDialog :open="passwordOpen" @close="passwordOpen = false" />
   </div>
 </template>
 

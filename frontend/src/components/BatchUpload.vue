@@ -81,7 +81,7 @@ async function onFileSelected(event) {
   rowCount.value = rows.length
   uploading.value = true
   try {
-    const data = await api.uploadBatch(rows)
+    const data = await api.rekrutmen.uploadBatch(rows)
     const created = Number((data && data.created) || 0)
     summary.value = { created, skipped: (data && data.skipped) || [] }
     toast.success(`${created} data berhasil disimpan.`)
