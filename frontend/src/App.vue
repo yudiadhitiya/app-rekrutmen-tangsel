@@ -18,10 +18,13 @@ const navLinks = computed(() => {
   const links = [
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/', label: 'Data Rekrutmen' },
-    { to: '/tambah', label: 'Tambah' },
-    { to: '/aktivitas', label: 'Aktivitas' }
+    { to: '/tambah', label: 'Tambah' }
   ]
-  if (admin.value) links.push({ to: '/pengaturan', label: 'Pengaturan' })
+  // Master Aktivitas hanya dikelola admin penuh, sama seperti di API.
+  if (admin.value) {
+    links.push({ to: '/aktivitas', label: 'Aktivitas' })
+    links.push({ to: '/pengaturan', label: 'Pengaturan' })
+  }
   return links
 })
 
@@ -37,7 +40,7 @@ async function handleLogout() {
   <div class="app-shell">
     <header v-if="!isPublicPage" class="app-bar">
       <div class="app-bar__inner">
-        <RouterLink to="/" class="app-bar__brand">
+        <RouterLink to="/dashboard" class="app-bar__brand">
           <span class="app-bar__logo">RT</span>
           <span>Rekrutmen Tangsel</span>
         </RouterLink>

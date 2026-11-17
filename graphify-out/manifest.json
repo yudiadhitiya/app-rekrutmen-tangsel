@@ -162,9 +162,9 @@
     "semantic_hash": ""
   },
   "frontend/src/App.vue": {
-    "mtime": 1794811903.198923,
-    "seen": 1794863783.1114645,
-    "ast_hash": "1ec284f11cc12807a33f8d459fce3017",
+    "mtime": 1794906926.2538836,
+    "seen": 1794907026.4138744,
+    "ast_hash": "0599138f0873aa08a0dcb433cb3b5118",
     "semantic_hash": ""
   },
   "frontend/src/api.js": {
@@ -210,9 +210,9 @@
     "semantic_hash": ""
   },
   "frontend/src/router.js": {
-    "mtime": 1794811899.2869232,
-    "seen": 1794863783.1283708,
-    "ast_hash": "775873d29da1fb016e8c095fcbd0d231",
+    "mtime": 1794906929.4378836,
+    "seen": 1794907026.4724636,
+    "ast_hash": "c59f1a9dd29c24fe6194f85cadfa27c8",
     "semantic_hash": ""
   },
   "frontend/src/toast.js": {
@@ -240,9 +240,9 @@
     "semantic_hash": ""
   },
   "frontend/src/views/LoginView.vue": {
-    "mtime": 1794865887.7862277,
-    "seen": 1794880631.5595186,
-    "ast_hash": "ca5ac055720b9b6d0ecb2e4cba3dfa91",
+    "mtime": 1794896256.6167898,
+    "seen": 1794907026.4891722,
+    "ast_hash": "9e359ad12adda0235bce48717e7dbdab",
     "semantic_hash": ""
   },
   "frontend/src/views/SettingsView.vue": {
@@ -672,8 +672,8 @@
     "semantic_hash": ""
   },
   "tests/e2e/browser-check.png": {
-    "mtime": 1794838444.3884413,
-    "seen": 1794863783.1834393,
+    "mtime": 1794901194.3994665,
+    "seen": 1794907026.5239644,
     "ast_hash": "e83717bf28c0892a69dfe0adc8168115",
     "semantic_hash": ""
   },

@@ -68,8 +68,10 @@ async function handleSubmit() {
     if (result && result.migrated) {
       toast.success('Akun berhasil dimigrasikan. Username dan kata sandi yang sama tetap berlaku.')
     }
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-    await router.replace(redirect)
+    // The dashboard is the landing page of every account. The `redirect`
+    // query is only kept when it points at a page the account may open.
+    const target = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard'
+    await router.replace(target)
   } catch (err) {
     errorMessage.value = err.message || 'Gagal masuk. Silakan coba lagi.'
     passwordInput.value?.focus()

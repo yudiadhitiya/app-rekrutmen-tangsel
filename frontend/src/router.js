@@ -14,9 +14,9 @@ const routes = [
   { path: '/', name: 'list', component: ListView, meta: { title: 'Data Rekrutmen' } },
   { path: '/tambah', name: 'tambah', component: FormView, meta: { title: 'Tambah Rekrutmen' } },
   { path: '/ubah/:id', name: 'ubah', component: FormView, meta: { title: 'Ubah Rekrutmen' } },
-  { path: '/aktivitas', name: 'aktivitas', component: AktivitasView, meta: { title: 'Master Aktivitas' } },
+  { path: '/aktivitas', name: 'aktivitas', component: AktivitasView, meta: { title: 'Master Aktivitas', admin: true } },
   { path: '/pengaturan', name: 'pengaturan', component: SettingsView, meta: { title: 'Pengaturan', admin: true } },
-  { path: '/:pathMatch(.*)*', redirect: '/' }
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
 ]
 
 const router = createRouter({
@@ -28,7 +28,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   if (to.meta.public) {
     // Already signed in users should not stay on the login screen.
-    if (auth.user) return { path: '/' }
+    if (auth.user) return { path: '/dashboard' }
     return true
   }
 
@@ -37,7 +37,7 @@ router.beforeEach(async (to) => {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
   if (to.meta.admin && !isFullAdmin()) {
-    return { path: '/' }
+    return { path: '/dashboard' }
   }
   return true
 })

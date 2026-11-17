@@ -1,7 +1,7 @@
 # Graph Report - app-rekrutmen-tangsel  (2026-11-17)
 
 ## Corpus Check
-- 121 files · ~131,449 words
+- 121 files · ~131,491 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 6 file(s) not represented in the graph (top: .csv 2, (none) 1, .example 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7aa15e02`
+- Built from commit: `545af112`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -408,16 +408,16 @@ Nodes (3): read_rows(), TestTextLayoutDataContracts, TestTextLayoutRetrieval
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `5.3 — Hak hapus & master data berbasis level` connect `User` to `New`, `newTestEnv`, `DashboardView.vue`, `App.vue`?**
-  _High betweenness centrality (0.049) - this node is a cross-community bridge._
+- **Why does `9.1.4 Item pekerjaan` connect `batch_test.go` to `local/store_test.go`, `ListView.vue`, `Rekrutmen`, `mapping_test.go`, `batch.go`?**
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `User` (e.g. with `5.1 — Granularity role` and `5.1 Kembalikan granularity role ✅`) actually correct?**
   _`User` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `testEnv`, `rekrutmen-tangsel/backend`, `PATH` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `BatchUpload.vue` be split into smaller, more focused modules?**
   _Cohesion score 0.06829268292682927 - nodes in this community are weakly interconnected._
-- **Why does `Rekrutmen` connect `Rekrutmen` to `5.2 — Scope di API`, `User`, `testEnv`, `model.go`, `buildPlan`, `sheets/store.go`, `Store`, `Rekrutmen`, `batch_test.go`, `dashboard.go`?**
-  _High betweenness centrality (0.047) - this node is a cross-community bridge._
+- **Why does `5.3 — Hak hapus & master data berbasis level` connect `User` to `New`, `newTestEnv`, `DashboardView.vue`, `App.vue`?**
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
 - **Are the 28 inferred relationships involving `newTestEnv()` (e.g. with `TestBatchAcceptsTheFieldNamesOfThisApplication()` and `TestBatchAcceptsTheSpellingsOfThePreviousApplication()`) actually correct?**
   _`newTestEnv()` has 28 INFERRED edges - model-reasoned connections that need verification._
 - **Should `User` be split into smaller, more focused modules?**
