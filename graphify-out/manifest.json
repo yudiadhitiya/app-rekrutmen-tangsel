@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "frontend/src/views/FormView.vue": {
-    "mtime": 1794197008.022693,
-    "seen": 1794324622.5086844,
-    "ast_hash": "0c48a2a86959c86c4ee738dd787cdda9",
+    "mtime": 1794884145.999199,
+    "seen": 1794889850.4153192,
+    "ast_hash": "62edaf5decdd84d50cc9a325ef030d96",
     "semantic_hash": ""
   },
   "frontend/src/views/ListView.vue": {
@@ -240,9 +240,9 @@
     "semantic_hash": ""
   },
   "frontend/src/views/LoginView.vue": {
-    "mtime": 1794431585.0242424,
-    "seen": 1794434090.733303,
-    "ast_hash": "4c10f243b59024473a040e4222b71fea",
+    "mtime": 1794865887.7862277,
+    "seen": 1794880631.5595186,
+    "ast_hash": "ca5ac055720b9b6d0ecb2e4cba3dfa91",
     "semantic_hash": ""
   },
   "frontend/src/views/SettingsView.vue": {
@@ -726,9 +726,9 @@
     "semantic_hash": ""
   },
   "frontend/src/views/DashboardView.vue": {
-    "mtime": 1794811872.2469232,
-    "seen": 1794863783.134843,
-    "ast_hash": "441b6a30ad884f801149f1e53f322ebf",
+    "mtime": 1794881800.1848474,
+    "seen": 1794883291.8238142,
+    "ast_hash": "20d7be99784ade4e2ced28ecc407787b",
     "semantic_hash": ""
   },
   "tests/e2e/dashboard.spec.ts": {
