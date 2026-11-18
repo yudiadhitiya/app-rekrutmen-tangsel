@@ -1,5 +1,46 @@
 {
-  "rekrutmen": null,
+  "rekrutmen": [
+    {
+      "id": "2240bf9c-7cef-432c-8175-e7f34b4e1ce4",
+      "nama": "Dashboard Admin Satu",
+      "no_wa": "62816252201",
+      "alamat": "",
+      "rt": "",
+      "rw": "",
+      "kecamatan": "Serpong",
+      "kelurahan": "",
+      "aktivitas": "Wiraswasta",
+      "tingkat_penerimaan": "Terbuka",
+      "metode": "Halaqoh",
+      "status": "Berhasil",
+      "keterangan": "e2e dashboard",
+      "upl": "",
+      "created_at": "2026-11-18T11:33:56.220555235Z",
+      "updated_at": "2026-11-18T11:33:56.220555235Z",
+      "created_by": "pwadmin",
+      "updated_by": "pwadmin"
+    },
+    {
+      "id": "d24d9575-e102-451f-9827-44c178413638",
+      "nama": "Dashboard Anggota Satu",
+      "no_wa": "62816252202",
+      "alamat": "",
+      "rt": "",
+      "rw": "",
+      "kecamatan": "Ciputat",
+      "kelurahan": "",
+      "aktivitas": "Wiraswasta",
+      "tingkat_penerimaan": "Terbuka",
+      "metode": "Program Antara",
+      "status": "Proses",
+      "keterangan": "e2e dashboard",
+      "upl": "",
+      "created_at": "2026-11-18T11:34:00.04897164Z",
+      "updated_at": "2026-11-18T11:34:00.04897164Z",
+      "created_by": "pwpetugas",
+      "updated_by": "pwpetugas"
+    }
+  ],
   "aktivitas": [
     {
       "id": "57b09669-d7bd-460c-a3bb-ef0abb462518",

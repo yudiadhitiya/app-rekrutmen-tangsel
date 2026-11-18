@@ -791,14 +791,30 @@ func (m *Manager) sign(value string) string {
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
-// ParseUsers reads the users file, creating a default admin/petugas pair when
-// the file does not exist yet.
-func ParseUsers(path string) ([]User, error) {
+// ParseUsers reads the accounts of the given file.
+//
+// When the file does not exist yet, the first administrator of the
+// installation is created from the given bootstrap. No account with a
+// password that is written down in the source code is ever made, so an
+// installation that is started without a password of its own gets a random
+// one instead.
+func ParseUsers(path string, boot Bootstrap) ([]User, error) {
 	users, err := loadUsers(path)
 	if err != nil {
 		return nil, err
 	}
-	return users, nil
+	if len(users) > 0 {
+		return users, nil
+	}
+
+	admin, err := bootstrapAdmin(boot)
+	if err != nil {
+		return nil, err
+	}
+	if err := saveUsers(path, []User{admin}); err != nil {
+		return nil, err
+	}
+	return []User{admin}, nil
 }
 
 // RandomSecret returns a random secret used to sign sessions.

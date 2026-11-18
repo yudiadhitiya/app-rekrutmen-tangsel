@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"rekrutmen-tangsel/backend/internal/auth"
+	"rekrutmen-tangsel/backend/internal/authtest"
 	"rekrutmen-tangsel/backend/internal/settings"
 )
 
@@ -64,7 +65,7 @@ func TestSecurityHeadersHSTSOnSecureRequest(t *testing.T) {
 // the Secure flag when the proxy reports a secure request.
 func TestSessionCookieSecureBehindProxy(t *testing.T) {
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	setStore, err := settings.NewStore(dir + "/settings.json")
 	if err != nil {
 		t.Fatal(err)
@@ -107,7 +108,7 @@ func TestSessionCookieSecureBehindProxy(t *testing.T) {
 // the setting of a server that always sits behind TLS.
 func TestSessionCookieSecureForced(t *testing.T) {
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	authMgr.SetSecureCookies(true)
 	setStore, err := settings.NewStore(dir + "/settings.json")
 	if err != nil {
@@ -145,7 +146,7 @@ func TestSessionCookieSecureForced(t *testing.T) {
 // API with the session of the user.
 func TestCORSOnlyAllowedOrigins(t *testing.T) {
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	setStore, err := settings.NewStore(dir + "/settings.json")
 	if err != nil {
 		t.Fatal(err)
@@ -175,7 +176,7 @@ func TestCORSOnlyAllowedOrigins(t *testing.T) {
 // the password of the account.
 func TestLoginBodyIsNotLogged(t *testing.T) {
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	setStore, err := settings.NewStore(dir + "/settings.json")
 	if err != nil {
 		t.Fatal(err)
@@ -204,7 +205,7 @@ func TestLoginBodyIsNotLogged(t *testing.T) {
 // is refused, so one request cannot take the memory of the server.
 func TestRequestBodyLimit(t *testing.T) {
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	setStore, err := settings.NewStore(dir + "/settings.json")
 	if err != nil {
 		t.Fatal(err)

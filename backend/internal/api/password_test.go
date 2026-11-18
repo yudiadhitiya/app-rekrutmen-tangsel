@@ -3,10 +3,12 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"rekrutmen-tangsel/backend/internal/auth"
+	"rekrutmen-tangsel/backend/internal/authtest"
 	"rekrutmen-tangsel/backend/internal/model"
 	"rekrutmen-tangsel/backend/internal/settings"
 )
@@ -48,7 +50,7 @@ func (f *fakeLegacyStore) SetLegacyPassword(username, password string) (bool, er
 func newTestEnvWithLegacy(t *testing.T, legacy *fakeLegacyStore) *testEnv {
 	t.Helper()
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	authMgr.SetLegacyAuthenticator(legacy)
 	authMgr.SetUsersPath(filepath.Join(dir, "users.json"))
 	setStore, err := settings.NewStore(filepath.Join(dir, "settings.json"))
@@ -258,5 +260,26 @@ func TestChangePasswordUpdatesTheAccountOfThePreviousApplication(t *testing.T) {
 	}
 	if !legacy.changed || legacy.password != "baru12345" {
 		t.Errorf("password warisan: %q (ditulis: %v)", legacy.password, legacy.changed)
+	}
+}
+
+// TestChangePasswordRemovesTheInitialPasswordFile checks that the file that
+// holds the password of the first administrator is removed once that
+// password has been replaced.
+func TestChangePasswordRemovesTheInitialPasswordFile(t *testing.T) {
+	env := newTestEnv(t)
+	passFile := filepath.Join(env.server.cfg.DataDir, "initial_admin_password.txt")
+	if err := os.WriteFile(passFile, []byte("password: acak\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if code := env.login("admin", "admin123"); code != http.StatusOK {
+		t.Fatalf("login: %d", code)
+	}
+	if code := env.changePassword("admin123", "baru12345"); code != http.StatusOK {
+		t.Fatalf("ubah password: %d", code)
+	}
+	if _, err := os.Stat(passFile); !os.IsNotExist(err) {
+		t.Error("berkas password awal harus dihapus setelah password diganti")
 	}
 }

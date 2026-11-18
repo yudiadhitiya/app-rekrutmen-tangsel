@@ -25,7 +25,7 @@ func (f *fakeLegacy) VerifyLegacy(username, password string) (model.User, bool, 
 
 func testManager(t *testing.T) *Manager {
 	t.Helper()
-	users := DefaultUsers()
+	users := testUsers()
 	m := NewManager(users, []byte("test-secret"))
 	m.SetUsersPath(filepath.Join(t.TempDir(), "users.json"))
 	return m

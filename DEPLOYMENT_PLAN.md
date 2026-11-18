@@ -110,6 +110,9 @@ Prinsip:
 | `DATA_DIR` | `./data` | ya | direktori data + backup |
 | `FRONTEND_DIR` | `frontend/dist` | ya | path absolut ke hasil build |
 | `SESSION_SECRET` | generate | **wajib** | hex panjang; sesi jadi invalid bila berubah |
+| `ADMIN_USERNAME` | `admin` | tidak | akun administrator pertama, dipakai bila `data/users.json` belum ada |
+| `ADMIN_PASSWORD` | acak | **wajib** | minimal 12 karakter; bila kosong, password acak ditulis ke `data/initial_admin_password.txt` |
+| `ADMIN_NAMA` | `Administrator` | tidak | nama tampilan administrator pertama |
 | `SUPABASE_URL` | — | bila pakai Supabase | URL project |
 | `SUPABASE_API_KEY` | — | bila pakai Supabase | service-role key (rahasia) |
 | `GOOGLE_SHEET_ID` | — | bila pakai Sheets | ID spreadsheet |
@@ -209,6 +212,10 @@ ADDR=127.0.0.1:8080
 DATA_DIR=/opt/rekrutmen/data
 FRONTEND_DIR=/opt/rekrutmen/frontend
 SESSION_SECRET=<hex panjang, rahasia>
+# Password administrator pertama, minimal 12 karakter.
+# Hapus baris ini setelah installation berjalan, karena user.json sudah ada.
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<minimal 12 karakter, rahasia>
 COOKIE_SECURE=true
 # ALLOWED_ORIGINS kosong bila frontend dan API dilayani host yang sama
 ALLOWED_ORIGINS=
@@ -334,6 +341,7 @@ server {
 |---|---|---|
 | `data/users.json` | hash password + salt | **tinggi** — jangan bocorkan |
 | `data/session.secret` | kunci penandatangan cookie | **tinggi** |
+| `data/initial_admin_password.txt` | password administrator awal | **tinggi** — hapus setelah password diganti |
 | `data/settings.json` | provider aktif | rendah |
 | `data/*.json` (local store) | data rekrutmen | **tinggi** — data pribadi |
 | Supabase | data rekrutmen | **tinggi** |
@@ -501,7 +509,7 @@ curl -fsS http://127.0.0.1:8080/api/health
 | R-03 | `go vet ./...` bersih | — |
 | R-04 | Tidak ada secret di commit (`git log -p \| grep`) | D-08 |
 | R-05 | `SESSION_SECRET` di-set & berbeda dari default | P-03 |
-| R-06 | Password default **sudah diganti** | D-85 |
+| R-06 | Password administrator pertama **sudah diganti** (tidak ada akun default lagi) | D-85 |
 | R-07 | `ADDR=127.0.0.1:8080` (tidak `0.0.0.0`) | P-01 |
 | R-08 | HTTPS aktif, HTTP redirect ke HTTPS | P-25 |
 | R-09 | Cookie sesi punya flag `Secure` | P-27 |
@@ -538,7 +546,7 @@ curl -fsS http://127.0.0.1:8080/api/health
 | HTTPS | tidak | ya | ya (wajib) |
 | Data | dummy | dummy (salinan) | asli |
 | Sumber frontend | `npm run dev` | build statis | build statis |
-| User | `admin`/`admin123` | kredensial khusus | kredensial khusus |
+| User | dari `ADMIN_PASSWORD` | kredensial khusus | kredensial khusus |
 | `SESSION_SECRET` | generate | tetap | tetap & rahasia |
 
 ---

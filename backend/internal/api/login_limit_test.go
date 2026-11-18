@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"rekrutmen-tangsel/backend/internal/auth"
+	"rekrutmen-tangsel/backend/internal/authtest"
 	"rekrutmen-tangsel/backend/internal/settings"
 )
 
@@ -16,7 +17,7 @@ import (
 func newLoginTestEnv(t *testing.T, maxAttempts int) *testEnv {
 	t.Helper()
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	setStore, err := settings.NewStore(filepath.Join(dir, "settings.json"))
 	if err != nil {
 		t.Fatal(err)

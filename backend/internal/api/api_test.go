@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"rekrutmen-tangsel/backend/internal/auth"
+	"rekrutmen-tangsel/backend/internal/authtest"
 	"rekrutmen-tangsel/backend/internal/model"
 	"rekrutmen-tangsel/backend/internal/settings"
 )
@@ -32,7 +33,7 @@ func newTestEnv(t *testing.T) *testEnv {
 func newTestEnvWithUploadLimit(t *testing.T, maxAttempts int) *testEnv {
 	t.Helper()
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	setStore, err := settings.NewStore(filepath.Join(dir, "settings.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +57,7 @@ func newTestEnvWithUploadLimit(t *testing.T, maxAttempts int) *testEnv {
 func newTestEnvWithUsers(t *testing.T, extra []auth.User) *testEnv {
 	t.Helper()
 	dir := t.TempDir()
-	users := append(auth.DefaultUsers(), extra...)
+	users := append(authtest.Users(), extra...)
 	authMgr := auth.NewManager(users, []byte("test-secret"))
 	setStore, err := settings.NewStore(filepath.Join(dir, "settings.json"))
 	if err != nil {
@@ -583,7 +584,7 @@ func (l *legacyAuthenticator) VerifyLegacy(username, password string) (model.Use
 
 func TestLoginWithLegacyAccount(t *testing.T) {
 	dir := t.TempDir()
-	users := auth.DefaultUsers()
+	users := authtest.Users()
 	authMgr := auth.NewManager(users, []byte("test-secret"))
 	authMgr.SetUsersPath(filepath.Join(dir, "users.json"))
 	legacy := &legacyAuthenticator{
@@ -651,7 +652,7 @@ func TestLoginWithLegacyAccount(t *testing.T) {
 
 func TestLoginWithWrongLegacyPassword(t *testing.T) {
 	dir := t.TempDir()
-	users := auth.DefaultUsers()
+	users := authtest.Users()
 	authMgr := auth.NewManager(users, []byte("test-secret"))
 	authMgr.SetUsersPath(filepath.Join(dir, "users.json"))
 	authMgr.SetLegacyAuthenticator(&legacyAuthenticator{ok: false})

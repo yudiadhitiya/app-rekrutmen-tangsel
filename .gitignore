@@ -11,6 +11,12 @@ data/
 backend/data/
 *.secret
 
+# Password of the first administrator, written when it is made randomly.
+initial_admin_password.txt
+
+# Akun uji E2E: dibuat ulang oleh `go run ./cmd/e2eseed`, tidak perlu di repo.
+e2e-data/users.json
+
 # Environment
 .env
 .env.local

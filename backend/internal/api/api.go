@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -447,7 +448,26 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, us
 			writeError(w, http.StatusInternalServerError, "gagal membuat sesi")
 			return
 		}
+		// The password of the first administrator was written to a file when
+		// it was made randomly. That file is useless once the password has
+		// been replaced, so it is removed.
+		s.removeInitialPasswordFile()
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	}
+}
+
+// removeInitialPasswordFile removes the file that holds the password of the
+// first administrator.
+//
+// The failure is not reported: the file is a convenience, and the password
+// has already been replaced.
+func (s *Server) removeInitialPasswordFile() {
+	if s.cfg.DataDir == "" {
+		return
+	}
+	path := filepath.Join(s.cfg.DataDir, "initial_admin_password.txt")
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		log.Printf("gagal menghapus berkas password awal: %v", err)
 	}
 }
 

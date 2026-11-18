@@ -75,6 +75,9 @@ Environment (opsional):
 | `DATA_DIR`          | lokasi data runtime, default `./data`                   |
 | `FRONTEND_DIR`      | folder hasil build frontend, default `frontend/dist`     |
 | `SESSION_SECRET`    | kunci penandatangan cookie sesi                         |
+| `ADMIN_USERNAME`    | akun administrator pertama, default `admin`              |
+| `ADMIN_PASSWORD`    | password administrator pertama (minimal 12 karakter); kosong = acak |
+| `ADMIN_NAMA`        | nama tampilan administrator pertama, default `Administrator` |
 | `SUPABASE_URL`      | URL project Supabase, contoh `https://xxx.supabase.co`  |
 | `SUPABASE_API_KEY`  | service-role key Supabase                               |
 | `GOOGLE_SHEET_ID`   | ID spreadsheet Google Sheets                            |
@@ -109,14 +112,26 @@ npm run build    # menghasilkan frontend/dist, dilayani backend
 
 ## Akun awal
 
-Dibuat otomatis pada jalankan pertama, tersimpan di `data/users.json`:
+Pada jalankan pertama, aplikasi membuat **satu** akun administrator di
+`data/users.json`. Passwordnya:
 
-| Username  | Password    | Peran   |
-| --------- | ----------- | ------- |
-| `admin`   | `admin123`  | admin   |
-| `petugas` | `petugas123`| petugas |
+- dari environment `ADMIN_PASSWORD` (minimal 12 karakter), atau
+- acak, kalau `ADMIN_PASSWORD` tidak diisi. Password acak itu ditulis ke
+  `data/initial_admin_password.txt` (izin `0600`) dan **hanya** dicetak di
+  log sebagai nama berkasnya.
 
-**Ganti password ini sebelum dipakai di produksi.**
+Tidak ada lagi akun bawaan dengan password yang tertulis di kode. Akun
+`petugas` pun tidak dibuat otomatis; akun anggota berasal dari tab `USERS`
+atau dari pendaftaran mandiri.
+
+| Environment     | Kegunaan                            | Bawaan         |
+| --------------- | ----------------------------------- | -------------- |
+| `ADMIN_USERNAME`| Nama akun administrator pertama     | `admin`        |
+| `ADMIN_PASSWORD`| Password administrator pertama      | acak           |
+| `ADMIN_NAMA`    | Nama tampilan administrator pertama | `Administrator` |
+
+**Ganti password administrator setelah masuk, lalu hapus
+`data/initial_admin_password.txt`.**
 
 ## Menyiapkan Supabase
 

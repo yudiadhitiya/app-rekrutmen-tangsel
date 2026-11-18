@@ -195,7 +195,7 @@ Vue 3 + Vue Router + Vite. Sumber: `frontend/src/`.
 | D-82 | **Flag `Secure` pada cookie sesi** | ⬜ | `auth.go:113` & `auth.go:126` — wajib saat HTTPS |
 | D-83 | **Rate limit login (anti brute-force)** | ⬜ | `api.go:251` — endpoint login terbuka |
 | D-84 | **Endpoint ganti password** | ✅ | lihat D-31 |
-| D-85 | **Hapus password default / paksa ganti saat login pertama** | ⬜ | `auth/users.go:20-22` |
+| D-85 | **Hapus password default / paksa ganti saat login pertama** | ✅ | `auth/users.go` — tidak ada akun default lagi; administrator pertama dari `ADMIN_PASSWORD` atau password acak (`data/initial_admin_password.txt`) |
 | D-86 | **CORS allow-list** | ⬜ | `api.go:234` mencerminkan `Origin` apa pun |
 | D-87 | **Header keamanan (CSP, X-Frame-Options, HSTS)** | ⬜ | belum ada middleware |
 | D-88 | **Rate limit / pagination batas atas `limit`** | ⬜ | `api.go:405` — `limit` tanpa cap |

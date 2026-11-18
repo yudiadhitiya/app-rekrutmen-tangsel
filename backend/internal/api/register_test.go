@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"rekrutmen-tangsel/backend/internal/auth"
+	"rekrutmen-tangsel/backend/internal/authtest"
 	"rekrutmen-tangsel/backend/internal/model"
 	"rekrutmen-tangsel/backend/internal/settings"
 	"rekrutmen-tangsel/backend/internal/store/sheets"
@@ -35,7 +36,7 @@ func (f *fakeRegistrar) RegisterUser(reg model.Registration) error {
 func newRegisterEnv(t *testing.T, registrar auth.Registrar) *testEnv {
 	t.Helper()
 	dir := t.TempDir()
-	authMgr := auth.NewManager(auth.DefaultUsers(), []byte("test-secret"))
+	authMgr := auth.NewManager(authtest.Users(), []byte("test-secret"))
 	if registrar != nil {
 		authMgr.SetRegistrar(registrar)
 	}

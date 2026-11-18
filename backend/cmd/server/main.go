@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -97,7 +98,7 @@ func main() {
 		}
 	}
 
-	users, err := auth.ParseUsers(filepath.Join(dataDir, "users.json"))
+	users, err := prepareUsers(dataDir)
 	if err != nil {
 		log.Fatalf("gagal memuat pengguna: %v", err)
 	}
@@ -231,4 +232,48 @@ func main() {
 		log.Fatalf("server berhenti: %v", err)
 	}
 	log.Printf("server ditutup dengan rapi")
+}
+
+// prepareUsers reads the accounts of the installation and creates the first
+// administrator when the account file holds none yet.
+//
+// The password of that administrator comes from ADMIN_PASSWORD. When none is
+// given, a random one is made and written to a file that only the owner of
+// the service may read, so an installation never carries a password that is
+// written down in the source code or in a log everybody can see.
+func prepareUsers(dataDir string) ([]auth.User, error) {
+	usersPath := filepath.Join(dataDir, "users.json")
+	fresh, err := auth.NeedsBootstrap(usersPath)
+	if err != nil {
+		return nil, err
+	}
+
+	boot := auth.Bootstrap{
+		Username: env("ADMIN_USERNAME", "admin"),
+		Password: strings.TrimSpace(os.Getenv("ADMIN_PASSWORD")),
+		Nama:     env("ADMIN_NAMA", "Administrator"),
+	}
+	generated := false
+	if fresh && boot.Password == "" {
+		boot.Password, err = auth.RandomPassword(16)
+		if err != nil {
+			return nil, err
+		}
+		generated = true
+	}
+
+	users, err := auth.ParseUsers(usersPath, boot)
+	if err != nil {
+		return nil, err
+	}
+	if generated {
+		passFile := filepath.Join(dataDir, "initial_admin_password.txt")
+		content := fmt.Sprintf("username: %s\npassword: %s\n", boot.Username, boot.Password)
+		if err := os.WriteFile(passFile, []byte(content), 0o600); err != nil {
+			return nil, err
+		}
+		log.Printf("akun %q dibuat dengan password acak; passwordnya ada di %s", boot.Username, passFile)
+		log.Printf("ganti password itu setelah masuk, lalu hapus berkas tersebut")
+	}
+	return users, nil
 }
