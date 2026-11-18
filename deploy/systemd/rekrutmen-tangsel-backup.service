@@ -1,0 +1,17 @@
+[Unit]
+Description=Cadangan data Rekrutmen Tangsel
+Documentation=file:/opt/rekrutmen/README.md
+
+[Service]
+Type=oneshot
+User=rekrutmen
+Group=rekrutmen
+WorkingDirectory=/opt/rekrutmen
+EnvironmentFile=/etc/rekrutmen-tangsel.env
+ExecStart=/opt/rekrutmen/rekr-backup backup -data /opt/rekrutmen/data -out /var/backups/rekrutmen-tangsel -keep 14
+
+# Cadangan berisi data pribadi, jadi hasil dan errornya tidak ikut ke log
+# yang dibaca banyak orang.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rekrutmen-backup

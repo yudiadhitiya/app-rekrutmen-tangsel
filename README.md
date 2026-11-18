@@ -86,6 +86,9 @@ Environment (opsional):
 | `GOOGLE_SHEETS_TAB_PENGGUNA`  | nama tab akun app lama, default `USERS` |
 | `LEGACY_AUTH_MODE`            | `upgrade` (default), `sheet`, atau `off` — cara memakai akun app lama |
 | `UPLOAD_MAX_ATTEMPTS`         | jumlah upload massal per akun per 10 menit, default `5` |
+| `COOKIE_SECURE`   | `true` memaksa flag `Secure` pada cookie sesi; default `auto` (mengikuti TLS atau `X-Forwarded-Proto: https`) |
+| `ALLOWED_ORIGINS` | origin yang boleh memanggil API dengan kredensial, dipisah koma; kosong = hanya asal yang sama |
+| `TRUST_PROXY` | `true` bila aplikasi di belakang reverse proxy sendiri (nginx) yang menulis alamat asli di `X-Forwarded-For`; default `false` (alamat koneksi) |
 
 Backend membaca konfigurasi langsung dari environment; tidak ada file `.env`
 yang dimuat otomatis. Untuk pengembangan, ekspor variabelnya di shell:

@@ -1,0 +1,63 @@
+# Menjalankan aplikasi dengan Docker.
+#
+#   docker compose up -d --build
+#
+# Port application's tidak dibuka ke seluruh jaringan; hanya ke localhost,
+# karena nginx atau reverse proxy lain yang menghadap ke internet.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rekrutmen-tangsel:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      ADDR: ":8080"
+      DATA_DIR: /app/data
+      FRONTEND_DIR: /app/frontend
+      # Isi SESSION_SECRET dengan hex acak. Jangan simpan di dalam compose.
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      # true bila aplikasi selalu berada di belakang TLS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # true bila aplikasi di belakang reverse proxy yang menulis alamat
+      # pengirim di X-Forwarded-For (nginx). Wajib true di produksi.
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      # Origin yang boleh memanggil API, dipisah koma.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      LEGACY_AUTH_MODE: ${LEGACY_AUTH_MODE:-upgrade}
+      GOOGLE_SHEET_ID: ${GOOGLE_SHEET_ID:-}
+      GOOGLE_KEY_FILE: ${GOOGLE_KEY_FILE:-}
+    volumes:
+      # Data akun, pengaturan, dan secret sesi. Volume ini tidak boleh
+      # hilang, jadi jangan pernah memakai "docker compose down -v".
+      - rekrutmen-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Cadangan harian. Aktifkan dengan:
+  #   docker compose --profile backup up -d
+  backup:
+    profiles: ["backup"]
+    image: rekrutmen-tangsel:latest
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        while true; do
+          /app/rekr-backup backup -data /app/data -out /app/backups -keep 14;
+          sleep 86400;
+        done
+    volumes:
+      - rekrutmen-data:/app/data
+      - rekrutmen-backups:/app/backups
+
+volumes:
+  rekrutmen-data:
+  rekrutmen-backups:

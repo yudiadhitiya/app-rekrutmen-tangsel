@@ -1,0 +1,95 @@
+{
+  "rekrutmen": null,
+  "aktivitas": [
+    {
+      "id": "57b09669-d7bd-460c-a3bb-ef0abb462518",
+      "nama": "Agen Asuransi",
+      "aktif": true
+    },
+    {
+      "id": "f82d0d54-fda1-457f-999b-89899ee0febf",
+      "nama": "Buruh Pabrik",
+      "aktif": true
+    },
+    {
+      "id": "71a7736b-c515-4e09-9aaa-026318608f9b",
+      "nama": "Driver Ojek Online",
+      "aktif": true
+    },
+    {
+      "id": "30767f30-46f3-467c-b120-31e275604582",
+      "nama": "Driver Taksi Online",
+      "aktif": true
+    },
+    {
+      "id": "a155d593-3f14-4861-b1f8-ace178afd37b",
+      "nama": "Guru",
+      "aktif": true
+    },
+    {
+      "id": "9a312acf-b94d-47a1-a192-960a28aace22",
+      "nama": "Ibu Rumah Tangga",
+      "aktif": true
+    },
+    {
+      "id": "bed3f6e9-417b-426e-bd7d-fc8c4517842a",
+      "nama": "Karyawan Swasta",
+      "aktif": true
+    },
+    {
+      "id": "bff11bfb-5baa-47f0-8702-ade7a0a201dc",
+      "nama": "Pedagang",
+      "aktif": true
+    },
+    {
+      "id": "01a5d826-eacf-4333-9a77-eeffea0ed8dc",
+      "nama": "Pedagang Online",
+      "aktif": true
+    },
+    {
+      "id": "7a6c1665-d350-45e3-8bd9-c48a05531bc5",
+      "nama": "Pelajar / Mahasiswa",
+      "aktif": true
+    },
+    {
+      "id": "c122120b-3cf9-4a9b-b87a-dd5d348eede8",
+      "nama": "Pensiunan",
+      "aktif": true
+    },
+    {
+      "id": "a2b53108-d7bd-4dba-99b3-75f7c9b0c799",
+      "nama": "Petani",
+      "aktif": true
+    },
+    {
+      "id": "6ea932fa-17a3-4b0b-a59b-91afa950a1dd",
+      "nama": "Perawat",
+      "aktif": true
+    },
+    {
+      "id": "bc847fbf-46dd-4923-9651-856cd0023a3e",
+      "nama": "Pedagang Keeping",
+      "aktif": true
+    },
+    {
+      "id": "8d9f4e50-1f28-4297-8b03-3af8e0b5a8c3",
+      "nama": "Wiraswasta",
+      "aktif": true
+    },
+    {
+      "id": "a42a0df8-d72e-4641-8a74-326206cd4b74",
+      "nama": "Ustadz / Daiyah",
+      "aktif": true
+    },
+    {
+      "id": "7c716707-46e7-4825-9fdf-670df7f9d4e0",
+      "nama": "Tukang Bangun",
+      "aktif": true
+    },
+    {
+      "id": "d29be9ac-ffe7-4348-b296-255422bb371b",
+      "nama": "Pengusaha",
+      "aktif": true
+    }
+  ]
+}

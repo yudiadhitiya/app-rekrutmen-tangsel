@@ -1,0 +1,17 @@
+# Isi yang tidak perlu masuk ke image.
+.git
+.github
+node_modules
+frontend/node_modules
+frontend/dist
+backend/data
+backend/bin
+data
+graphify-out
+old-app
+tests
+test-results
+playwright-report
+*.log
+.env
+.env.local

@@ -1,0 +1,44 @@
+[Unit]
+Description=Rekrutmen Tangsel - server aplikasi
+Documentation=file:/opt/rekrutmen/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rekrutmen
+Group=rekrutmen
+WorkingDirectory=/opt/rekrutmen
+
+# Konfigurasi ada di berkas terpisah, supaya rahasianya tidak ada di dalam
+# unit ini. Isinya lihat /opt/rekrutmen/deploy/.env.example.
+EnvironmentFile=/etc/rekrutmen-tangsel.env
+
+ExecStart=/opt/rekrutmen/rekr-server
+
+# Server menutup permintaan yang sedang berjalan sebelum berhenti, jadi
+# jeda stopping harus lebih lama dari batas penutupannya.
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+# Server selalu kembali hidup kalau berhenti karena error.
+Restart=always
+RestartSec=5s
+
+# Pengerasan: aplikasi hanya boleh menulis di direktori data.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/opt/rekrutmen/data
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rekrutmen-tangsel
+
+[Install]
+WantedBy=multi-user.target

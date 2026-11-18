@@ -1,10 +1,8 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -97,12 +95,12 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Question2 string `json:"question2"`
 		Answer2   string `json:"answer2"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "body tidak valid")
+	if err := decodeJSON(w, r, &body); err != nil {
+		bodyError(w, err)
 		return
 	}
 
-	if !s.registerLimiter.allow(registerAddress(r)) {
+	if !s.registerLimiter.allow(s.clientAddress(r)) {
 		writeError(w, http.StatusTooManyRequests, "terlalu banyak percobaan pendaftaran. Coba lagi nanti.")
 		return
 	}
@@ -198,16 +196,4 @@ func isSecurityQuestion(q string) bool {
 		}
 	}
 	return false
-}
-
-// registerAddress returns the address the attempt comes from.
-func registerAddress(r *http.Request) string {
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		return strings.TrimSpace(strings.Split(forwarded, ",")[0])
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }

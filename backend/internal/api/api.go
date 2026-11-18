@@ -55,6 +55,22 @@ type Config struct {
 	// UploadMaxAttempts is the number of batch uploads one account may
 	// start in ten minutes. Zero means the default of five.
 	UploadMaxAttempts int
+
+	// AllowedOrigins are the origins that may call the API from a browser.
+	// An empty list means only the same origin may do so.
+	AllowedOrigins []string
+
+	// LoginMaxAttempts is the number of failed sign ins one account or one
+	// address may make before the sign in is refused. Zero means the default.
+	LoginMaxAttempts int
+
+	// TrustProxy says that a reverse proxy of this application writes the
+	// real address of the caller in the X-Forwarded-For header. The header is
+	// only read when this is true, because a caller can set it by itself.
+	//
+	// Without it the address of the connection is used. Behind a reverse
+	// proxy that means every request shares the address of the proxy.
+	TrustProxy bool
 }
 
 // Server holds the HTTP handlers and the active storage provider.
@@ -68,6 +84,10 @@ type Server struct {
 
 	// registerLimiter counts the self-registration attempts per address.
 	registerLimiter *registerLimiter
+
+	// loginLimiter counts the failed sign ins per account and per address,
+	// so the login cannot be used to guess a password.
+	loginLimiter *loginLimiter
 
 	// uploadLimiter counts the batch upload attempts per account.
 	uploadLimiter *uploadLimiter
@@ -84,6 +104,7 @@ func New(cfg Config, authMgr *auth.Manager, setStore *settings.Store) (*Server, 
 		auth:            authMgr,
 		settings:        setStore,
 		registerLimiter: newRegisterLimiter(),
+		loginLimiter:    newLoginLimiter(cfg.LoginMaxAttempts),
 		uploadLimiter:   newUploadLimiter(cfg.UploadMaxAttempts),
 		storeFactory: func(provider string) (store.Store, error) {
 			switch provider {
@@ -184,6 +205,34 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]any{"error": msg})
+}
+
+// MaxJSONBody is the largest request body that is read as JSON.
+//
+// The limit keeps a single request from taking the memory of the server. The
+// batch upload has its own, larger limit.
+const MaxJSONBody = 1 << 20
+
+// decodeJSON reads the body of a request as JSON.
+//
+// The body is limited, so a request that is too large is refused instead of
+// being read into the memory of the server.
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, MaxJSONBody)
+	return json.NewDecoder(r.Body).Decode(dst)
+}
+
+// bodyError writes the answer for a body that could not be read.
+//
+// A body that is too large gets its own status, so the client knows it must
+// send less data.
+func bodyError(w http.ResponseWriter, err error) {
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		writeError(w, http.StatusRequestEntityTooLarge, "body terlalu besar")
+		return
+	}
+	writeError(w, http.StatusBadRequest, "body tidak valid")
 }
 
 func writeFieldError(w http.ResponseWriter, msg string, fields validate.Fields) {
@@ -293,25 +342,7 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "provider": s.Store().Name()})
 	})
 
-	return withCORS(mux)
-}
-
-// withCORS allows the Vite dev server to call the API.
-func withCORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		}
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+	return withCORS(mux, s.cfg.AllowedOrigins)
 }
 
 // ---------------------------------------------------------------------------
@@ -323,13 +354,20 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "body tidak valid")
+	if err := decodeJSON(w, r, &body); err != nil {
+		bodyError(w, err)
+		return
+	}
+	username := strings.TrimSpace(body.Username)
+	if s.loginLocked(w, r, username) {
 		return
 	}
 	user, fromLegacy, err := s.auth.VerifyLogin(body.Username, body.Password)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
+			// The failed attempt is counted, so the password cannot be
+			// guessed by trying many times.
+			s.loginLimiter.fail(username, s.clientAddress(r))
 			writeError(w, http.StatusUnauthorized, "username atau password salah")
 			return
 		}
@@ -338,6 +376,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "gagal memverifikasi akun: "+err.Error())
 		return
 	}
+	s.loginLimiter.reset(username, s.clientAddress(r))
 
 	// The account came from the previous application. Store it locally, so
 	// the next sign in uses the salted hash of this application.
@@ -350,7 +389,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := s.auth.SetSession(w, user); err != nil {
+	if err := s.auth.SetSession(w, r, user); err != nil {
 		writeError(w, http.StatusInternalServerError, "gagal membuat sesi")
 		return
 	}
@@ -358,7 +397,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	s.auth.ClearSession(w)
+	s.auth.ClearSession(w, r)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -376,8 +415,8 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, us
 		CurrentPassword string `json:"current_password"`
 		NewPassword     string `json:"new_password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "body tidak valid")
+	if err := decodeJSON(w, r, &body); err != nil {
+		bodyError(w, err)
 		return
 	}
 	if body.CurrentPassword == "" {
@@ -401,6 +440,13 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, us
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, "gagal mengubah password: "+err.Error())
 	default:
+		// The password change invalidated the sessions that were made
+		// before it, including this one. A fresh session is written, so the
+		// browser that changed the password stays signed in.
+		if err := s.auth.SetSession(w, r, user); err != nil {
+			writeError(w, http.StatusInternalServerError, "gagal membuat sesi")
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	}
 }
@@ -435,8 +481,8 @@ func (s *Server) handleCreateAktivitas(w http.ResponseWriter, r *http.Request, u
 	var body struct {
 		Nama string `json:"nama"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "body tidak valid")
+	if err := decodeJSON(w, r, &body); err != nil {
+		bodyError(w, err)
 		return
 	}
 	if fields := validate.Aktivitas(body.Nama); len(fields) > 0 {
@@ -461,8 +507,8 @@ func (s *Server) handleUpdateAktivitas(w http.ResponseWriter, r *http.Request, u
 		Nama  string `json:"nama"`
 		Aktif *bool  `json:"aktif"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "body tidak valid")
+	if err := decodeJSON(w, r, &body); err != nil {
+		bodyError(w, err)
 		return
 	}
 	if fields := validate.Aktivitas(body.Nama); len(fields) > 0 {
@@ -621,18 +667,18 @@ func (s *Server) aktivitasNames() []string {
 	return out
 }
 
-func (s *Server) decodeRekrutmen(r *http.Request) (*model.Rekrutmen, error) {
+func (s *Server) decodeRekrutmen(w http.ResponseWriter, r *http.Request) (*model.Rekrutmen, error) {
 	var rec model.Rekrutmen
-	if err := json.NewDecoder(r.Body).Decode(&rec); err != nil {
+	if err := decodeJSON(w, r, &rec); err != nil {
 		return nil, err
 	}
 	return &rec, nil
 }
 
 func (s *Server) handleCreateRekrutmen(w http.ResponseWriter, r *http.Request, user model.User) {
-	rec, err := s.decodeRekrutmen(r)
+	rec, err := s.decodeRekrutmen(w, r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "body tidak valid")
+		bodyError(w, err)
 		return
 	}
 	if fields := validate.Rekrutmen(rec, s.aktivitasNames()); len(fields) > 0 {
@@ -658,9 +704,9 @@ func (s *Server) handleCreateRekrutmen(w http.ResponseWriter, r *http.Request, u
 }
 
 func (s *Server) handleUpdateRekrutmen(w http.ResponseWriter, r *http.Request, user model.User) {
-	rec, err := s.decodeRekrutmen(r)
+	rec, err := s.decodeRekrutmen(w, r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "body tidak valid")
+		bodyError(w, err)
 		return
 	}
 	if fields := validate.Rekrutmen(rec, s.aktivitasNames()); len(fields) > 0 {
@@ -772,8 +818,8 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request, user 
 	var body struct {
 		Provider string `json:"provider"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "body tidak valid")
+	if err := decodeJSON(w, r, &body); err != nil {
+		bodyError(w, err)
 		return
 	}
 	if !settings.IsValidProvider(body.Provider) {

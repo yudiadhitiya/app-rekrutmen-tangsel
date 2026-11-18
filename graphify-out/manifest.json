@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "backend/cmd/server/main.go": {
-    "mtime": 1794837908.2295992,
-    "seen": 1794863783.0149357,
-    "ast_hash": "0717290663058959bba93dda21d9ec71",
+    "mtime": 1794958725.912079,
+    "seen": 1794959256.4368308,
+    "ast_hash": "0e1943abfaabb85aaef29b46a8901bca",
     "semantic_hash": ""
   },
   "backend/go.mod": {
@@ -30,9 +30,9 @@
     "semantic_hash": ""
   },
   "backend/internal/api/api.go": {
-    "mtime": 1794837888.9815993,
-    "seen": 1794863783.029754,
-    "ast_hash": "d25bfde4ae2f76076f251fa4200cf478",
+    "mtime": 1794958683.7200792,
+    "seen": 1794959256.4464922,
+    "ast_hash": "f7f91ffff325e75479319b0566f1435c",
     "semantic_hash": ""
   },
   "backend/internal/api/api_test.go": {
@@ -48,9 +48,9 @@
     "semantic_hash": ""
   },
   "backend/internal/auth/auth.go": {
-    "mtime": 1794754013.4652605,
-    "seen": 1794776641.2735696,
-    "ast_hash": "064e3c05d131bfe80c7ef590f1b0ec84",
+    "mtime": 1794911386.283882,
+    "seen": 1794959256.4853532,
+    "ast_hash": "b1a48e9303292fb013b8603ff7d4e91c",
     "semantic_hash": ""
   },
   "backend/internal/auth/users.go": {
@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "DEPLOYMENT_PLAN.md": {
-    "mtime": 1794838504.4724412,
-    "seen": 1794863783.1760814,
-    "ast_hash": "ec456d71d5b1e06af64679482c9c1d47",
+    "mtime": 1794959161.116079,
+    "seen": 1794959256.6509228,
+    "ast_hash": "7001d6dfe93a7a4cd1d1cabe77735fc5",
     "semantic_hash": ""
   },
   "DEVELOPMENT_PLAN.md": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1794840241.5311744,
-    "seen": 1794863783.1770098,
-    "ast_hash": "2ab757cba09b80dea403546a6935b636",
+    "mtime": 1794959142.272079,
+    "seen": 1794959256.651984,
+    "ast_hash": "7a9e83ec95a19e2c525d7fda1bfb6c0c",
     "semantic_hash": ""
   },
   "SHEETS_INTEGRATION_PLAN.md": {
@@ -348,9 +348,9 @@
     "semantic_hash": ""
   },
   "backend/internal/api/register.go": {
-    "mtime": 1794410942.2794423,
-    "seen": 1794434090.6242268,
-    "ast_hash": "3f0f64e3c44de3303e655eadd7b43258",
+    "mtime": 1794958715.2520792,
+    "seen": 1794959256.4685235,
+    "ast_hash": "85deb69f900aa3b0f8bc41e6ddc68f27",
     "semantic_hash": ""
   },
   "backend/internal/api/register_test.go": {
@@ -735,6 +735,66 @@
     "mtime": 1794817739.9586082,
     "seen": 1794863783.164039,
     "ast_hash": "db6adb017309e3db9c4c1676dbae495a",
+    "semantic_hash": ""
+  },
+  "backend/internal/api/security.go": {
+    "mtime": 1794909470.848774,
+    "seen": 1794910454.3883524,
+    "ast_hash": "663999afc6d409ea2d3e2133aab86bc7",
+    "semantic_hash": ""
+  },
+  "backend/internal/api/security_test.go": {
+    "mtime": 1794929131.9294105,
+    "seen": 1794959256.483763,
+    "ast_hash": "63d2b10b6fb7d34d4491d3bbcdb35201",
+    "semantic_hash": ""
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1794927359.1303804,
+    "seen": 1794959256.4342465,
+    "ast_hash": "a55a10fabfbae2364f2da4dec72a3b6a",
+    "semantic_hash": ""
+  },
+  "backend/cmd/backup/main.go": {
+    "mtime": 1794926948.2688541,
+    "seen": 1794959256.4342563,
+    "ast_hash": "3e0879263429a8f4ae51462e310e4205",
+    "semantic_hash": ""
+  },
+  "backend/cmd/backup/main_test.go": {
+    "mtime": 1794927010.792854,
+    "seen": 1794959256.434261,
+    "ast_hash": "6868f85b71a1a8a2971aaff45c07136d",
+    "semantic_hash": ""
+  },
+  "backend/internal/api/clientip.go": {
+    "mtime": 1794958676.7400792,
+    "seen": 1794959256.4538999,
+    "ast_hash": "ba042712a9049ad9221b676dfbb01988",
+    "semantic_hash": ""
+  },
+  "backend/internal/api/clientip_test.go": {
+    "mtime": 1794958749.952079,
+    "seen": 1794959256.4539137,
+    "ast_hash": "16e8aabd789ca91d8cc24588e9b45888",
+    "semantic_hash": ""
+  },
+  "backend/internal/api/login_limit.go": {
+    "mtime": 1794958684.2360792,
+    "seen": 1794959256.4674747,
+    "ast_hash": "e7619880b376333ac34c777c2dc427c0",
+    "semantic_hash": ""
+  },
+  "backend/internal/api/login_limit_test.go": {
+    "mtime": 1794925992.3756776,
+    "seen": 1794959256.4674838,
+    "ast_hash": "f1adf6543573b5074eb70c084e7f7e62",
+    "semantic_hash": ""
+  },
+  "docker-compose.yml": {
+    "mtime": 1794958731.040079,
+    "seen": 1794959256.5971828,
+    "ast_hash": "a58ff918701a5c79ba38cbf2a0342ce2",
     "semantic_hash": ""
   },
   "frontend/package-lock.json": {

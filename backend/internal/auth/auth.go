@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -93,6 +94,18 @@ type LegacyProfiler interface {
 	LegacyProfile(username string) (model.User, bool, error)
 }
 
+// LegacyStatus reports the profile and the active flag of an account of the
+// previous application.
+//
+// It is optional. An account store that implements it lets this application
+// keep the salted local hash of a password, while the access of the account
+// and its active flag still come from the previous application.
+type LegacyStatus interface {
+	// LegacyAccountStatus returns the account as it is known to the previous
+	// application, and whether that account may sign in.
+	LegacyAccountStatus(username string) (model.User, bool, error)
+}
+
 // User is a stored account with a password hash.
 type User struct {
 	model.User
@@ -124,15 +137,101 @@ type Manager struct {
 	// path is the file the accounts are stored in. It is empty when the
 	// manager must not write to disk.
 	path string
+
+	// secureCookies forces the Secure flag on the session cookie, whatever the
+	// request looks like. It is used in production, where the server always
+	// sits behind TLS.
+	secureCookies bool
+
+	// versions holds the session token of every account whose password was
+	// changed. A session that carries an older token is refused, so a stolen
+	// session stops working as soon as the password is replaced.
+	versions map[string]string
+
+	// versionsPath is the file the session tokens are stored in. It is empty
+	// when they must not be written to disk.
+	versionsPath string
 }
 
 // NewManager builds a Manager from a list of users and a signing secret.
 func NewManager(users []User, secret []byte) *Manager {
-	m := &Manager{users: make(map[string]User, len(users)), secret: secret}
+	m := &Manager{
+		users:    make(map[string]User, len(users)),
+		secret:   secret,
+		versions: map[string]string{},
+	}
 	for _, u := range users {
 		m.users[strings.ToLower(u.Username)] = u
 	}
 	return m
+}
+
+// SetSessionVersionsPath sets the file the session tokens are stored in, so a
+// password change keeps its effect over a restart.
+//
+// The tokens that are already in the file are loaded, so the sessions that
+// were made invalid stay invalid.
+func (m *Manager) SetSessionVersionsPath(path string) {
+	m.mu.Lock()
+	m.versionsPath = path
+	m.mu.Unlock()
+
+	if path == "" {
+		return
+	}
+	stored := map[string]string{}
+	if b, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(b, &stored)
+	}
+	m.mu.Lock()
+	for key, value := range stored {
+		m.versions[strings.ToLower(key)] = value
+	}
+	m.mu.Unlock()
+}
+
+// sessionVersion returns the token of an account.
+//
+// It is empty for an account whose password was never changed, so the
+// sessions of that account keep working.
+func (m *Manager) sessionVersion(username string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.versions[strings.ToLower(strings.TrimSpace(username))]
+}
+
+// bumpVersion replaces the token of an account, so every session that was
+// made before the change stops working.
+//
+// The token is random, so it cannot be guessed, and it is stored on disk, so
+// the sessions stay invalid after a restart.
+func (m *Manager) bumpVersion(username string) error {
+	key := strings.ToLower(strings.TrimSpace(username))
+	if key == "" {
+		return ErrAccountNotFound
+	}
+	token := make([]byte, 16)
+	if _, err := rand.Read(token); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	m.versions[key] = hex.EncodeToString(token)
+	path := m.versionsPath
+	all := make(map[string]string, len(m.versions))
+	for name, value := range m.versions {
+		all[name] = value
+	}
+	m.mu.Unlock()
+
+	if path == "" {
+		return nil
+	}
+	b, err := json.MarshalIndent(all, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, b, 0o600)
 }
 
 // SetLegacyAuthenticator sets the source that verifies accounts of the
@@ -161,9 +260,11 @@ func (m *Manager) CanRegister() bool {
 }
 
 // RegisterUser stores a new member account.
+//
 // The account is written to the account store of the previous application,
-// so the member can sign in with it in both applications. It stays there
-// until the first sign in, which migrates it to the local store.
+// so the member can sign in with it in both applications. It is also stored
+// locally with a salted hash, so this application never has to check such a
+// password against the unsalted hash of the previous application.
 func (m *Manager) RegisterUser(reg model.Registration) error {
 	m.mu.RLock()
 	registrar := m.registrar
@@ -172,7 +273,10 @@ func (m *Manager) RegisterUser(reg model.Registration) error {
 	if registrar == nil {
 		return ErrNoRegistrar
 	}
-	return registrar.RegisterUser(reg)
+	if err := registrar.RegisterUser(reg); err != nil {
+		return err
+	}
+	return m.storeRegisteredUser(reg)
 }
 
 // SetSheetOnly makes the account store of the previous application the only
@@ -192,6 +296,42 @@ func (m *Manager) SetUsersPath(path string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.path = path
+}
+
+// SetSecureCookies forces the Secure flag on the session cookie.
+//
+// Behind a reverse proxy that terminates TLS, the request itself is plain
+// HTTP, so the flag cannot always be derived from the request. Setting this
+// makes every session cookie secure anyway.
+func (m *Manager) SetSecureCookies(v bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.secureCookies = v
+}
+
+// isSecure reports whether the session cookie must carry the Secure flag.
+//
+// A request that arrives over TLS is secure. A request that arrives over
+// plain HTTP but carries the forwarding header of a proxy that terminated
+// TLS is secure as well, so the cookie is still protected.
+func (m *Manager) isSecure(r *http.Request) bool {
+	m.mu.RLock()
+	forced := m.secureCookies
+	m.mu.RUnlock()
+	if forced {
+		return true
+	}
+	if r == nil {
+		return false
+	}
+	if r.TLS != nil {
+		return true
+	}
+	proto := r.Header.Get("X-Forwarded-Proto")
+	if i := strings.IndexByte(proto, ','); i >= 0 {
+		proto = proto[:i]
+	}
+	return strings.EqualFold(strings.TrimSpace(proto), "https")
 }
 
 // VerifyLogin checks a password against the stored accounts.
@@ -232,19 +372,11 @@ func (m *Manager) VerifyLogin(username, password string) (model.User, bool, erro
 	}
 
 	if ok {
-		if err := m.verifyStored(u, password); err != nil {
+		user, err := m.verifyLocal(u, password)
+		if err != nil {
 			return model.User{}, false, err
 		}
-		// An account that was migrated before the access levels were
-		// introduced carries none. They are taken from the previous
-		// application, so an administrator of a district does not get the
-		// access of a full administrator.
-		if u.User.Level == 0 && isLegacyID(u.User.ID) {
-			if user, done := m.completeProfile(u.User); done {
-				u.User = user
-			}
-		}
-		return u.User, false, nil
+		return user, false, nil
 	}
 
 	if legacy == nil {
@@ -486,6 +618,12 @@ func (m *Manager) ChangePassword(username, current, next string) error {
 			return ErrAccountNotFound
 		}
 	}
+
+	// The sessions that were made before the change stop working, so a stolen
+	// session cannot be used once the password was replaced.
+	if err := m.bumpVersion(username); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -507,19 +645,24 @@ func (m *Manager) saveAll() error {
 }
 
 // SetSession writes a signed session cookie for the user.
-func (m *Manager) SetSession(w http.ResponseWriter, user model.User) error {
+//
+// The cookie carries the Secure flag whenever the request is secure, so it is
+// never sent over a plain connection in production.
+func (m *Manager) SetSession(w http.ResponseWriter, r *http.Request, user model.User) error {
 	payload := struct {
 		Username  string `json:"u"`
 		Role      string `json:"r"`
 		Level     int    `json:"l"`
 		Kecamatan string `json:"k"`
 		Expires   int64  `json:"e"`
+		Version   string `json:"v,omitempty"`
 	}{
 		Username:  user.Username,
 		Role:      user.Role,
 		Level:     user.LevelOrDefault(),
 		Kecamatan: user.Kecamatan,
 		Expires:   time.Now().Add(sessionTTL).Unix(),
+		Version:   m.sessionVersion(user.Username),
 	}
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -532,6 +675,7 @@ func (m *Manager) SetSession(w http.ResponseWriter, user model.User) error {
 		Value:    enc + "." + sig,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   m.isSecure(r),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(sessionTTL),
 	})
@@ -539,12 +683,16 @@ func (m *Manager) SetSession(w http.ResponseWriter, user model.User) error {
 }
 
 // ClearSession expires the session cookie.
-func (m *Manager) ClearSession(w http.ResponseWriter) {
+//
+// The flags match the ones of the session cookie, so the browser removes it
+// even when the connection is secure.
+func (m *Manager) ClearSession(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   m.isSecure(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
@@ -574,11 +722,18 @@ func (m *Manager) UserFromRequest(r *http.Request) (model.User, bool) {
 		Level     int    `json:"l"`
 		Kecamatan string `json:"k"`
 		Expires   int64  `json:"e"`
+		Version   string `json:"v"`
 	}
 	if err := json.Unmarshal(b, &payload); err != nil {
 		return model.User{}, false
 	}
 	if time.Now().Unix() > payload.Expires {
+		return model.User{}, false
+	}
+	// A session that was made before a password change carries an older
+	// token, so it is refused. The token of an account whose password was
+	// never changed is empty, so those sessions keep working.
+	if payload.Version != m.sessionVersion(payload.Username) {
 		return model.User{}, false
 	}
 	m.mu.RLock()

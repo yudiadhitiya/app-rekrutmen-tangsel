@@ -2,11 +2,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"rekrutmen-tangsel/backend/internal/api"
@@ -14,6 +19,10 @@ import (
 	"rekrutmen-tangsel/backend/internal/settings"
 	"rekrutmen-tangsel/backend/internal/store/sheets"
 )
+
+// shutdownTimeout is the time the server gets to finish the requests that
+// are running, after a stop signal.
+const shutdownTimeout = 20 * time.Second
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -37,10 +46,38 @@ func envInt(key string, fallback int) int {
 	return n
 }
 
+// splitList reads a comma separated list from the environment.
+func splitList(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// envBool reads a yes or no value from the environment.
+func envBool(key string, fallback bool) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	}
+	return fallback
+}
+
 func main() {
 	root := env("APP_ROOT", ".")
 	dataDir := env("DATA_DIR", filepath.Join(root, "data"))
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+	// The directory holds the accounts and the session secret, so only the
+	// user of the service may read it.
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		log.Fatalf("gagal membuat direktori data: %v", err)
 	}
 
@@ -66,6 +103,16 @@ func main() {
 	}
 	authMgr := auth.NewManager(users, secret)
 	authMgr.SetUsersPath(filepath.Join(dataDir, "users.json"))
+	// The tokens of the sessions that a password change invalidated. They
+	// are kept on disk, so the effect of a password change survives a
+	// restart.
+	authMgr.SetSessionVersionsPath(filepath.Join(dataDir, "session_versions.json"))
+	// The session cookie carries the Secure flag whenever the request is
+	// secure. COOKIE_SECURE=true forces it, which is the right setting for a
+	// server that always sits behind TLS.
+	if os.Getenv("COOKIE_SECURE") == "true" {
+		authMgr.SetSecureCookies(true)
+	}
 
 	// Accounts of the previous application live in the USERS sheet of the
 	// spreadsheet. When it is configured, a user can sign in with the
@@ -90,6 +137,7 @@ func main() {
 				// Every sign in is verified against the sheet, so a local
 				// copy of an account never decides a sign in.
 				authMgr.SetSheetOnly(true)
+				log.Printf("PERINGATAN: mode sheet memverifikasi password dengan hash SHA-256 tanpa salt milik app lama. Gunakan mode upgrade agar password diperiksa dengan hash ber-salt.")
 			}
 			tabPengguna := os.Getenv("GOOGLE_SHEETS_TAB_PENGGUNA")
 			if tabPengguna == "" {
@@ -118,7 +166,20 @@ func main() {
 		GoogleSheetsTabSumber:    os.Getenv("GOOGLE_SHEETS_TAB_SUMBER"),
 		GoogleSheetsTabPengguna:  os.Getenv("GOOGLE_SHEETS_TAB_PENGGUNA"),
 		LegacyAuthMode:           legacyMode,
-		UploadMaxAttempts:       envInt("UPLOAD_MAX_ATTEMPTS", api.DefaultUploadMaxAttempts),
+		UploadMaxAttempts:        envInt("UPLOAD_MAX_ATTEMPTS", api.DefaultUploadMaxAttempts),
+		LoginMaxAttempts:         envInt("LOGIN_MAX_ATTEMPTS", api.DefaultLoginMaxAttempts),
+		AllowedOrigins:           splitList(os.Getenv("ALLOWED_ORIGINS")),
+		TrustProxy:               envBool("TRUST_PROXY", false),
+	}
+
+	// The header X-Forwarded-For is only read when the reverse proxy of this
+	// application is trusted. Without that, every caller behind the proxy
+	// shares one address, so the counters of the addresses become the
+	// counters of the whole application.
+	if !cfg.TrustProxy {
+		log.Printf("TRUST_PROXY tidak aktif: header X-Forwarded-For diabaikan dan batas percobaan memakai alamat koneksi")
+	} else {
+		log.Printf("TRUST_PROXY aktif: alamat pengirim diambil dari X-Forwarded-For")
 	}
 
 	srv, err := api.New(cfg, authMgr, setStore)
@@ -143,11 +204,31 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           api.SecurityHeaders(mux),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
+
+	// The server is stopped with a signal, for example when systemd restarts
+	// the service. The requests that are running are finished first, so a
+	// deployment does not cut them off.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-stop
+		log.Printf("sinyal diterima, menutup server")
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := httpServer.Shutdown(ctx); err != nil {
+			log.Printf("penutupan server tidak tuntas: %v", err)
+		}
+	}()
+
 	log.Printf("server berjalan di http://localhost%s (provider: %s)", addr, srv.Store().Name())
-	if err := httpServer.ListenAndServe(); err != nil {
+	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("server berhenti: %v", err)
 	}
+	log.Printf("server ditutup dengan rapi")
 }

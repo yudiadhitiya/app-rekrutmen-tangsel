@@ -164,3 +164,48 @@ func TestLegacyRoleMapping(t *testing.T) {
 		}
 	}
 }
+
+func TestSheetsLegacyAccountStatus(t *testing.T) {
+	s, fake := newTestStore(t)
+	seedUsersTab(t, fake, legacyUsersRows(sha256Hex("rahasia")))
+
+	user, active, err := s.LegacyAccountStatus("anggota01")
+	if err != nil {
+		t.Fatalf("LegacyAccountStatus: %v", err)
+	}
+	if !active {
+		t.Error("akun aktif harus dilaporkan aktif")
+	}
+	if user.Username != "anggota01" || user.Level != model.LevelAnggota {
+		t.Errorf("profil: %+v", user)
+	}
+}
+
+func TestSheetsLegacyAccountStatusOfInactiveAccount(t *testing.T) {
+	s, fake := newTestStore(t)
+	seedUsersTab(t, fake, legacyUsersRows(sha256Hex("rahasia")))
+
+	_, active, err := s.LegacyAccountStatus("nonaktif")
+	if err != nil {
+		t.Fatalf("LegacyAccountStatus: %v", err)
+	}
+	if active {
+		t.Error("akun nonaktif harus dilaporkan tidak aktif")
+	}
+}
+
+func TestSheetsLegacyAccountStatusOfUnknownAccount(t *testing.T) {
+	s, fake := newTestStore(t)
+	seedUsersTab(t, fake, legacyUsersRows(sha256Hex("rahasia")))
+
+	user, active, err := s.LegacyAccountStatus("entah")
+	if err != nil {
+		t.Fatalf("LegacyAccountStatus: %v", err)
+	}
+	if active {
+		t.Error("akun yang tidak dikenal tidak boleh aktif")
+	}
+	if user.Username != "" {
+		t.Errorf("akun yang tidak dikenal harus kosong, dapat %+v", user)
+	}
+}

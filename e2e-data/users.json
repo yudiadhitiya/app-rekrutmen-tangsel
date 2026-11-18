@@ -1,0 +1,52 @@
+[
+  {
+    "id": "petugas",
+    "username": "petugas",
+    "nama": "Petugas",
+    "role": "petugas",
+    "level": 1,
+    "kecamatan": "",
+    "password_hash": "a6bf8354a76908ed09ef9436fefbab339b2d3d8c57f21219dbdc74182569f7e8",
+    "salt": "d14927999a349e2a07d1bb22470de96b"
+  },
+  {
+    "id": "admin",
+    "username": "admin",
+    "nama": "Administrator",
+    "role": "admin",
+    "level": 3,
+    "kecamatan": "",
+    "password_hash": "3400f10c3d2bb64921311f00954790ad5f13043a9c68d428a09559c101033aa3",
+    "salt": "ceb59f27bd4b5e59278b952925abc97a"
+  },
+  {
+    "id": "pwpetugas",
+    "username": "pwpetugas",
+    "nama": "Petugas Uji",
+    "role": "petugas",
+    "level": 1,
+    "kecamatan": "",
+    "password_hash": "e8f8bee82892a0ecb18cb9d9379c25b73afc542fda1888b5fd6e879ba4bfdcb2",
+    "salt": "494a7d8476365ca151785b8ffbcc5a8f"
+  },
+  {
+    "id": "pwkec",
+    "username": "pwkec",
+    "nama": "Kecamatan Uji",
+    "role": "admin",
+    "level": 2,
+    "kecamatan": "Serpong",
+    "password_hash": "8a7ed8ce166b31a62ab1ccb67c1e1caebcc42d4a26ce71d68b76f060c549b306",
+    "salt": "eb6af90550340566527fcf67b751e716"
+  },
+  {
+    "id": "pwadmin",
+    "username": "pwadmin",
+    "nama": "Admin Uji",
+    "role": "admin",
+    "level": 3,
+    "kecamatan": "",
+    "password_hash": "9ba09131fbb866ebde4364a97a088d64495a3c6f520456e0617a75dfe10fb1d4",
+    "salt": "98f4aa559e6aa764a435e0030541290e"
+  }
+]

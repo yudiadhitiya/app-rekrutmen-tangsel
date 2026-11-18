@@ -1,0 +1,13 @@
+[Unit]
+Description=Jalankan cadangan data Rekrutmen Tangsel setiap hari
+
+[Timer]
+# Setiap hari pukul 02.00, di luar jam sibuk.
+OnCalendar=*-*-* 02:00:00
+# Cadangan yang terlewat karena server mati dijalankan begitu server hidup
+# lagi.
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

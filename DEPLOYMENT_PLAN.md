@@ -33,7 +33,7 @@ nomornya masing-masing (`D-xx`, `T-xx`).
 | P1 — Environ & konfigurasi | 6 | 2 | 8 | env vars & `.env.example` |
 | P2 — Build & bundling | 4 | 3 | 7 | build Go + Vite |
 | P3 — Server & reverse proxy | 2 | 6 | 8 | systemd + nginx |
-| P4 — HTTPS & header keamanan | 0 | 5 | 5 | **blocker produksi** |
+| P4 — HTTPS & header keamanan | 3 | 2 | 5 | TLS & redirect masih jadi blocker |
 | P5 — Penyimpanan & data | 4 | 6 | 10 | backup/restore & migrasi |
 | P6 — CI/CD | 0 | 4 | 4 | **belum ada sama sekali** |
 | P7 — Monitoring & operasional | 2 | 7 | 9 | health check, log, backup otomatis |
@@ -50,7 +50,7 @@ nomornya masing-masing (`D-xx`, `T-xx`).
 | Build & Artifact | ✅ bisa dibangun (Go + Vite) |
 | Jalankan lokal | ✅ server boot, API & frontend terverifikasi |
 | Jalankan di server | 🔧 bisa — butuh systemd/nginx |
-| HTTPS | ⬜ belum ada |
+| HTTPS | 🔧 header & cookie siap; sertifikat TLS belum ada |
 | CI/CD | ⬜ belum ada |
 | Backup otomatis | ⬜ belum ada |
 | **Siap produksi?** | ❌ **belum** — P4 dan P6 adalah blocker |
@@ -118,6 +118,8 @@ Prinsip:
 | `GOOGLE_SHEETS_TAB_REKRUTMEN` | `Rekrutmen` | tidak | nama tab data rekrutmen |
 | `GOOGLE_SHEETS_TAB_AKTIVITAS` | `Aktivitas` | tidak | nama tab master aktivitas |
 | `GOOGLE_SHEETS_TAB_SUMBER` | `Form Responses 1` | tidak | nama tab sumber untuk impor |
+| `COOKIE_SECURE` | `auto` | ya | `true` memaksa flag `Secure` pada cookie sesi; `auto` mengikuti permintaan (TLS atau `X-Forwarded-Proto: https`) |
+| `ALLOWED_ORIGINS` | kosong | tidak | origin yang boleh memanggil API dengan kredensial, dipisah koma; kosong = hanya asal yang sama |
 | `GOOGLE_SHEETS_TAB_PENGGUNA` | `USERS` | tidak | nama tab akun aplikasi lama |
 | `LEGACY_AUTH_MODE` | `upgrade` | tidak | `upgrade`, `sheet`, atau `off` |
 | `APP_ROOT` | `.` | ya | root aplikasi untuk path relatif |
@@ -199,6 +201,21 @@ ReadWritePaths=/opt/rekrutmen/data
 WantedBy=multi-user.target
 ```
 
+### Contoh environment systemd
+
+```ini
+# /etc/rekrutmen-tangsel.env
+ADDR=127.0.0.1:8080
+DATA_DIR=/opt/rekrutmen/data
+FRONTEND_DIR=/opt/rekrutmen/frontend
+SESSION_SECRET=<hex panjang, rahasia>
+COOKIE_SECURE=true
+# ALLOWED_ORIGINS kosong bila frontend dan API dilayani host yang sama
+ALLOWED_ORIGINS=
+# nginx menulis alamat asli di X-Forwarded-For, jadi header itu dipercaya
+TRUST_PROXY=true
+```
+
 ### Contoh konfigurasi nginx
 
 ```nginx
@@ -209,12 +226,14 @@ server {
     ssl_certificate     /etc/letsencrypt/live/rekrutmen.example.go.id/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/rekrutmen.example.go.id/privkey.pem;
 
-    # Header keamanan (P-26)
+    # Header keamanan (P-26) — nilai CSP harus sama dengan
+    # backend/internal/api/security.go, karena pustaka Excel dimuat dari CDN.
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options    "nosniff" always;
     add_header X-Frame-Options           "DENY" always;
-    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy   "default-src 'self'" always;
+    add_header Referrer-Policy           "no-referrer" always;
+    add_header Permissions-Policy        "camera=(), microphone=(), geolocation=()" always;
+    add_header Content-Security-Policy   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:" always;
 
     # Artefak frontend
     root /opt/rekrutmen/frontend;
@@ -223,6 +242,14 @@ server {
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        # add_header di blok ini menggantikan header blok utama, jadi header
+        # keamanan harus diulang di sini.
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options    "nosniff" always;
+        add_header X-Frame-Options           "DENY" always;
+        add_header Referrer-Policy           "no-referrer" always;
+        add_header Permissions-Policy        "camera=(), microphone=(), geolocation=()" always;
+        add_header Content-Security-Policy   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:" always;
     }
 
     # SPA fallback
@@ -235,7 +262,9 @@ server {
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
-        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # Ditimpa, bukan ditambahkan: pemanggil tidak bisa menyisipkan alamat
+        # palsu untuk melewati batas percobaan login atau pendaftaran.
+        proxy_set_header X-Forwarded-For   $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
@@ -257,14 +286,30 @@ server {
 |---|---|---|---|
 | P-24 | **Sertifikat TLS** | ⬜ | Let's Encrypt + renew otomatis |
 | P-25 | **Redirect HTTP → HTTPS** | ⬜ | contoh di atas |
-| P-26 | **Header HSTS / X-Frame-Options / CSP / nosniff** | ⬜ | contoh di atas |
-| P-27 | **Flag `Secure` pada cookie sesi** | ⬜ | `auth.go:113`, `auth.go:126` — tanpa ini sesi bisa dicuri |
-| P-28 | **Cookie `Secure` honoris proxy** | ⬜ | bila `X-Forwarded-Proto` https |
+| P-26 | **Header HSTS / X-Frame-Options / CSP / nosniff** | ✅ | `internal/api/security.go` — middleware `SecurityHeaders`; contoh nginx diperbarui |
+| P-27 | **Flag `Secure` pada cookie sesi** | ✅ | `internal/auth/auth.go` — `isSecure(r)`, dipakai `SetSession` & `ClearSession` |
+| P-28 | **Cookie `Secure` honoris proxy** | ✅ | `X-Forwarded-Proto: https` dikenali; `COOKIE_SECURE=true` memaksa flag |
 
-> **P-27_detail:** saat ini cookie sesi di `backend/internal/auth/auth.go` di-set
-> dengan `HttpOnly` dan `SameSite=Lax` tetapi **tanpa `Secure`**. Di belakang
-> TLS, `Secure` wajib agar cookie tidak terkirim lewat koneksi HTTP biasa.
-> Perbaikannya cukup satu baris per pemanggilan `http.SetCookie`.
+> **P-27_detail (selesai):** cookie sesi di `backend/internal/auth/auth.go`
+> kini selalu menyertakan flag `Secure` bila permintaan itu aman — lewat
+> TLS langsung (`r.TLS != nil`) atau lewat proxy yang mengakhiri TLS
+> (`X-Forwarded-Proto: https`). `COOKIE_SECURE=true` memaksa flag tersebut
+> tanpa bergantung pada header, untuk server yang selalu berada di belakang
+> TLS. Flag yang sama dipakai `ClearSession`, agar cookie lama benar-benar
+> terhapus.
+
+> **P-26_detail (selesai):** middleware `SecurityHeaders` di
+> `backend/internal/api/security.go` memasang `X-Content-Type-Options`,
+> `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`,
+> `Content-Security-Policy`, dan `Strict-Transport-Security` (hanya pada
+> permintaan aman). Middleware dipasang pada seluruh respons, termasuk file
+> statis frontend. CSP mengizinkan `https://cdn.sheetjs.com` sebagai satu
+>-satunya sumber skrip asing, karena pustaka itu memuat file Excel.
+
+> **Catatan CORS:** CORS tidak lagi memantulkan `Origin` sembarangan.
+> Hanya origin yang terdaftar pada `ALLOWED_ORIGINS` yang boleh memanggil
+> API dengan kredensial. Kosong berarti hanya asal yang sama, yaitu keadaan
+> normal di produksi.
 
 ---
 
@@ -502,14 +547,16 @@ curl -fsS http://127.0.0.1:8080/api/health
 
 | Urutan | Item | Alasan |
 |---|---|---|
-| 1 | P-27 flag `Secure` + P-26 header keamanan | **blocker produksi** |
-| 2 | P-24/P-25 TLS + redirect | **blocker produksi** |
-| 3 | P-34/P-49 backup otomatis + P-35 restore | data pribadi |
-| 4 | P-39 CI | mencegah regresi |
-| 5 | P-18 systemd + P-19 nginx | operasional |
-| 6 | P-20 graceful shutdown | deploy tanpa cutoff mendadak |
-| 7 | P-07 `.env.example` + P-08 rotasi secret | onboarding |
-| 8 | P-52 Docker (opsional) | portabilitas |
+| 1 | P-24/P-25 TLS + redirect | **blocker produksi** (sisa P4) |
+| 2 | P-34/P-49 backup otomatis + P-35 restore | data pribadi |
+| 3 | P-39 CI | mencegah regresi |
+| 4 | P-18 systemd + P-19 nginx | operasional |
+| 5 | P-20 graceful shutdown | deploy tanpa cutoff mendadak |
+| 6 | P-07 `.env.example` + P-08 rotasi secret | onboarding |
+| 7 | P-52 Docker (opsional) | portabilitas |
+
+> P-26, P-27, dan P-28 sudah ✅: middleware header keamanan, flag `Secure`
+> pada cookie sesi, dan penghormatan `X-Forwarded-Proto` sudah ada di kode.
 
 > P-01, P-02, P-03, P-09, P-10, P-11, P-12, P-16, P-17, P-29 s.d. P-32, P-43,
 > P-44 sudah ✅ karena kode aplikasinya sudah mendukung — yang belum adalah

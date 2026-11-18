@@ -157,6 +157,31 @@ func (s *Store) LookupLegacy(username string) (model.User, bool, error) {
 	}, true, nil
 }
 
+// LegacyAccountStatus returns the account of the previous application as that
+// application knows it, and whether that account may sign in.
+//
+// It implements the auth.LegacyStatus contract, so the password of an account
+// is checked against the salted hash of the local store, while the access and
+// the active flag of the account are taken from this application. A change of
+// the role or a deactivation there therefore takes effect at once.
+func (s *Store) LegacyAccountStatus(username string) (model.User, bool, error) {
+	user, found, err := s.findLegacyUser(username)
+	if err != nil {
+		return model.User{}, false, err
+	}
+	if !found {
+		return model.User{}, false, nil
+	}
+	return model.User{
+		ID:        LegacyUserID(user.Username),
+		Username:  user.Username,
+		Nama:      user.Nama,
+		Role:      LegacyRole(user.Role),
+		Level:     LegacyLevel(user.Role),
+		Kecamatan: user.Kecamatan,
+	}, strings.EqualFold(strings.TrimSpace(user.Aktif), "Y"), nil
+}
+
 // SetLegacyPassword stores a new password for an account of the previous
 // application.
 //
@@ -261,11 +286,7 @@ func sha256Hex(password string) string {
 // LegacyUserID builds a stable id for an account of the previous
 // application, which does not carry one.
 func LegacyUserID(username string) string {
-	sum := sha256.Sum256([]byte("user:" + strings.ToLower(strings.TrimSpace(username))))
-	b := sum[:16]
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	return model.LegacyUserID(username)
 }
 
 // indexOfHeader returns the position of a column, matched without regard to
