@@ -195,13 +195,29 @@ export async function parseSpreadsheet(file) {
   })
 }
 
+// A spreadsheet reads a cell that starts with one of these characters as a
+// formula, not as text.
+//
+// A member may put such a text in a record, so a file that is downloaded must
+// not run it when somebody opens the file.
+const FORMULA_START = /^[=+\-@\t\r]/
+
+// escapeCSVCell keeps a cell from being read as a formula.
+//
+// The value is written with a leading apostrophe, which the spreadsheet shows
+// as ordinary text.
+export function escapeCSVCell(value) {
+  const text = value == null ? '' : String(value)
+  return FORMULA_START.test(text) ? `'${text}` : text
+}
+
 // toCSV writes cells as the text of a CSV file.
 export function toCSV(cells) {
   return cells
     .map((row) =>
       row
         .map((cell) => {
-          const value = cell == null ? '' : String(cell)
+          const value = escapeCSVCell(cell)
           return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
         })
         .join(',')

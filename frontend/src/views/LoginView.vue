@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { login } from '../auth'
 import { toast } from '../toast'
+import { MIN_PASSWORD_LENGTH } from '../constants'
 
 const route = useRoute()
 const router = useRouter()
@@ -111,6 +112,9 @@ async function handleRegister() {
   const next = {}
   if (!username.value.trim()) next.username = 'Username wajib diisi.'
   if (!password.value) next.password = 'Kata sandi wajib diisi.'
+  else if (password.value.length < MIN_PASSWORD_LENGTH) {
+    next.password = `Kata sandi minimal ${MIN_PASSWORD_LENGTH} karakter.`
+  }
   if (!nama.value.trim()) next.nama = 'Nama anggota wajib diisi.'
   if (!kecamatan.value) next.kecamatan = 'Kecamatan wajib dipilih.'
   if (!question1.value || !question2.value) next.question = 'Dua pertanyaan keamanan wajib dipilih.'

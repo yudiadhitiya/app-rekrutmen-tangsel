@@ -109,7 +109,7 @@ func (s *Server) handleExportRekrutmen(w http.ResponseWriter, r *http.Request, u
 
 	data, total, err := s.Store().ListRekrutmen(f)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "gagal menyiapkan data unduhan: "+err.Error())
+		writeStoreError(w, "gagal menyiapkan data unduhan", err)
 		return
 	}
 

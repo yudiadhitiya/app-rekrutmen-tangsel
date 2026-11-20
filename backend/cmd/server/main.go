@@ -119,6 +119,16 @@ func main() {
 	// spreadsheet. When it is configured, a user can sign in with the
 	// credentials they already had.
 	legacyMode := env("LEGACY_AUTH_MODE", "upgrade")
+	if legacyMode == "sheet" {
+		// The sheet of the previous application holds the password as a
+		// SHA-256 hash without a salt, so anybody who gets the sheet can
+		// read the passwords. The mode is only started when the operator
+		// says so, so it never happens by accident.
+		if !envBool("ALLOW_UNSAFE_LEGACY_SHEET_AUTH", false) {
+			log.Fatalf("LEGACY_AUTH_MODE=sheet membandingkan password dengan hash SHA-256 tanpa salt, jadi password dapat dibaca dari sheet. Pakai mode upgrade, atau set ALLOW_UNSAFE_LEGACY_SHEET_AUTH=true bila benar-benar diperlukan.")
+		}
+		log.Printf("PERINGATAN: mode sheet aktif karena ALLOW_UNSAFE_LEGACY_SHEET_AUTH=true. Password dibandingkan dengan hash SHA-256 tanpa salt milik app lama.")
+	}
 	if legacyMode == "off" {
 		log.Printf("login warisan dimatikan (LEGACY_AUTH_MODE=off)")
 	} else if os.Getenv("GOOGLE_SHEET_ID") != "" && os.Getenv("GOOGLE_KEY_FILE") != "" {
@@ -138,7 +148,6 @@ func main() {
 				// Every sign in is verified against the sheet, so a local
 				// copy of an account never decides a sign in.
 				authMgr.SetSheetOnly(true)
-				log.Printf("PERINGATAN: mode sheet memverifikasi password dengan hash SHA-256 tanpa salt milik app lama. Gunakan mode upgrade agar password diperiksa dengan hash ber-salt.")
 			}
 			tabPengguna := os.Getenv("GOOGLE_SHEETS_TAB_PENGGUNA")
 			if tabPengguna == "" {
@@ -146,6 +155,7 @@ func main() {
 			}
 			log.Printf("login warisan aktif dari sheet %q (mode: %s)", tabPengguna, legacyMode)
 			log.Printf("pendaftaran anggota menulis ke sheet %q", tabPengguna)
+			log.Printf("PERINGATAN: sheet USERS menyimpan password sebagai hash SHA-256 tanpa salt. Akun yang belum pernah masuk ke aplikasi ini masih memakai hash itu.")
 		}
 	}
 
@@ -275,5 +285,50 @@ func prepareUsers(dataDir string) ([]auth.User, error) {
 		log.Printf("akun %q dibuat dengan password acak; passwordnya ada di %s", boot.Username, passFile)
 		log.Printf("ganti password itu setelah masuk, lalu hapus berkas tersebut")
 	}
+
+	rotated, err := rotateDefaultPasswords(dataDir, usersPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(rotated) > 0 {
+		// The accounts are read again, so the server works with the new
+		// passwords.
+		users, err = auth.LoadUsers(usersPath)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return users, nil
+}
+
+// rotateDefaultPasswords replaces the password of every account that still
+// has one of the passwords that were written down in the source code.
+//
+// Such an account is known to everybody who ever read the code, so the
+// password is replaced by a random one. The new passwords are written to a
+// file that only the owner of the service may read, so the operator can hand
+// them out.
+func rotateDefaultPasswords(dataDir, usersPath string) ([]auth.RotatedAccount, error) {
+	rotated, err := auth.RotateDefaultPasswords(usersPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(rotated) == 0 {
+		return nil, nil
+	}
+
+	var content strings.Builder
+	content.WriteString("akun berikut memakai password bawaan lama, jadi passwordnya diganti acak.\n")
+	content.WriteString("berikan password barunya ke pemiliknya, lalu hapus berkas ini.\n\n")
+	for _, account := range rotated {
+		content.WriteString(fmt.Sprintf("username: %s\npassword: %s\n\n", account.Username, account.Password))
+	}
+	passFile := filepath.Join(dataDir, "rotated_passwords.txt")
+	if err := os.WriteFile(passFile, []byte(content.String()), 0o600); err != nil {
+		return nil, err
+	}
+	log.Printf("%d akun masih memakai password bawaan lama; passwordnya diganti acak dan ada di %s", len(rotated), passFile)
+	log.Printf("berikan password barunya ke pemiliknya, lalu hapus berkas tersebut")
+
+	return rotated, nil
 }

@@ -1,5 +1,11 @@
 // Shared enumerations and helpers mirroring API_CONTRACT.md.
 
+// The shortest password that is accepted.
+//
+// The server holds the same rule, so the browser refuses early what the
+// server would refuse anyway.
+export const MIN_PASSWORD_LENGTH = 12
+
 export const TINGKAT_PENERIMAAN = [
   'Sangat Terbuka',
   'Terbuka',

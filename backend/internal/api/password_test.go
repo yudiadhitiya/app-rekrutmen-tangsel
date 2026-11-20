@@ -83,7 +83,7 @@ func (e *testEnv) changePassword(current, next string) int {
 func TestChangePasswordNeedsSession(t *testing.T) {
 	env := newTestEnv(t)
 
-	if code := env.changePassword("petugas123", "petugas456"); code != http.StatusUnauthorized {
+	if code := env.changePassword("petugas123", "petugas-baru-4567"); code != http.StatusUnauthorized {
 		t.Fatalf("tanpa sesi harus ditolak: %d", code)
 	}
 }
@@ -96,7 +96,7 @@ func TestChangePasswordOfMemberAccount(t *testing.T) {
 		t.Fatalf("login: %d", code)
 	}
 
-	if code := env.changePassword("petugas123", "petugas456"); code != http.StatusOK {
+	if code := env.changePassword("petugas123", "petugas-baru-4567"); code != http.StatusOK {
 		t.Fatalf("anggota harus boleh mengganti password: %d", code)
 	}
 }
@@ -120,7 +120,7 @@ func TestChangePasswordOfEveryLevel(t *testing.T) {
 		if code := env.login(c.username, c.password); code != http.StatusOK {
 			t.Fatalf("login %s: %d", c.username, code)
 		}
-		if code := env.changePassword(c.password, "baru12345"); code != http.StatusOK {
+		if code := env.changePassword(c.password, "baru-sekarang-2024"); code != http.StatusOK {
 			t.Fatalf("level %s harus boleh mengganti password: %d", c.username, code)
 		}
 	}
@@ -137,7 +137,7 @@ func TestChangePasswordRejectsWrongCurrentPassword(t *testing.T) {
 	var out map[string]any
 	code := env.request(http.MethodPut, "/api/me/password", map[string]string{
 		"current_password": "salah",
-		"new_password":     "petugas456",
+		"new_password":     "petugas-baru-4567",
 	}, &out)
 	if code != http.StatusBadRequest {
 		t.Fatalf("password lama salah harus ditolak: %d", code)
@@ -192,7 +192,7 @@ func TestChangePasswordNeedsCurrentPassword(t *testing.T) {
 		t.Fatalf("login: %d", code)
 	}
 
-	if code := env.changePassword("", "petugas456"); code != http.StatusBadRequest {
+	if code := env.changePassword("", "petugas-baru-4567"); code != http.StatusBadRequest {
 		t.Fatalf("password lama kosong harus ditolak: %d", code)
 	}
 }
@@ -217,7 +217,7 @@ func TestChangePasswordKeepsTheSession(t *testing.T) {
 	if code := env.login("petugas", "petugas123"); code != http.StatusOK {
 		t.Fatalf("login: %d", code)
 	}
-	if code := env.changePassword("petugas123", "petugas456"); code != http.StatusOK {
+	if code := env.changePassword("petugas123", "petugas-baru-4567"); code != http.StatusOK {
 		t.Fatalf("ubah password: %d", code)
 	}
 
@@ -234,11 +234,11 @@ func TestChangePasswordIsUsedByTheNextLogin(t *testing.T) {
 	if code := env.login("petugas", "petugas123"); code != http.StatusOK {
 		t.Fatalf("login: %d", code)
 	}
-	if code := env.changePassword("petugas123", "petugas456"); code != http.StatusOK {
+	if code := env.changePassword("petugas123", "petugas-baru-4567"); code != http.StatusOK {
 		t.Fatalf("ubah password: %d", code)
 	}
 
-	if code := env.login("petugas", "petugas456"); code != http.StatusOK {
+	if code := env.login("petugas", "petugas-baru-4567"); code != http.StatusOK {
 		t.Errorf("login dengan password baru: %d", code)
 	}
 	if code := env.login("petugas", "petugas123"); code != http.StatusUnauthorized {
@@ -255,10 +255,10 @@ func TestChangePasswordUpdatesTheAccountOfThePreviousApplication(t *testing.T) {
 	if code := env.login("anggota01", "lama12345"); code != http.StatusOK {
 		t.Fatalf("login: %d", code)
 	}
-	if code := env.changePassword("lama12345", "baru12345"); code != http.StatusOK {
+	if code := env.changePassword("lama12345", "baru-sekarang-2024"); code != http.StatusOK {
 		t.Fatalf("ubah password: %d", code)
 	}
-	if !legacy.changed || legacy.password != "baru12345" {
+	if !legacy.changed || legacy.password != "baru-sekarang-2024" {
 		t.Errorf("password warisan: %q (ditulis: %v)", legacy.password, legacy.changed)
 	}
 }
@@ -276,7 +276,7 @@ func TestChangePasswordRemovesTheInitialPasswordFile(t *testing.T) {
 	if code := env.login("admin", "admin123"); code != http.StatusOK {
 		t.Fatalf("login: %d", code)
 	}
-	if code := env.changePassword("admin123", "baru12345"); code != http.StatusOK {
+	if code := env.changePassword("admin123", "baru-sekarang-2024"); code != http.StatusOK {
 		t.Fatalf("ubah password: %d", code)
 	}
 	if _, err := os.Stat(passFile); !os.IsNotExist(err) {

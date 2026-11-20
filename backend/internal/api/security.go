@@ -36,6 +36,12 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			// The answers of the API carry the data of the people who
+			// registered. They must not stay in a cache of the browser or of
+			// a proxy that sits in front of the application.
+			h.Set("Cache-Control", "no-store")
+		}
 		if IsSecureRequest(r) {
 			// Only a secure response may carry the instruction, otherwise a
 			// browser would pin the plain host to HTTPS.

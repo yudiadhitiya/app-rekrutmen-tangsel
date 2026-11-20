@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { api } from '../api'
 import { toast } from '../toast'
+import { MIN_PASSWORD_LENGTH } from '../constants'
 
 // The dialog is opened by the header of the application, so every signed in
 // account may change its own password.
@@ -38,8 +39,8 @@ async function handleSubmit() {
     errorMessage.value = 'Password baru wajib diisi.'
     return
   }
-  if (newPassword.value.length < 6) {
-    errorMessage.value = 'Password baru minimal 6 karakter.'
+  if (newPassword.value.length < MIN_PASSWORD_LENGTH) {
+    errorMessage.value = `Password baru minimal ${MIN_PASSWORD_LENGTH} karakter.`
     return
   }
   if (newPassword.value !== confirmPassword.value) {
@@ -95,7 +96,7 @@ async function handleSubmit() {
               class="input"
               type="password"
               autocomplete="new-password"
-              placeholder="Minimal 6 karakter"
+              placeholder="Minimal 12 karakter"
               :disabled="submitting"
             />
           </div>

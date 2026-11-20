@@ -47,6 +47,15 @@ func NeedsBootstrap(path string) (bool, error) {
 	return len(users) == 0, nil
 }
 
+// LoadUsers reads the accounts of the given file.
+//
+// A file that does not exist yields no accounts, so the caller decides how
+// the first administrator is created. No account with a known password is
+// ever made here.
+func LoadUsers(path string) ([]User, error) {
+	return loadUsers(path)
+}
+
 // loadUsers reads the accounts from the given file.
 //
 // A file that does not exist yields no accounts, so the caller decides how

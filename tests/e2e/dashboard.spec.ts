@@ -49,7 +49,7 @@ async function createRecord(
 test.describe.configure({ mode: 'serial' })
 
 test('Dashboard terbuka dari navigasi dan menampilkan semua panel', async ({ page }) => {
-  await login(page, 'pwadmin', 'pwadmin123')
+  await login(page, 'pwadmin', 'pwadmin-sekolah-2024')
 
   await page.getByRole('link', { name: 'Dashboard' }).click()
   await expect(page).toHaveURL(/\/dashboard/)
@@ -73,7 +73,7 @@ test('Dashboard terbuka dari navigasi dan menampilkan semua panel', async ({ pag
 })
 
 test('Admin penuh melihat seluruh data pada dashboard', async ({ page }) => {
-  await login(page, 'pwadmin', 'pwadmin123')
+  await login(page, 'pwadmin', 'pwadmin-sekolah-2024')
   await createRecord(page, wa(1), 'Dashboard Admin Satu', 'Serpong', 'Halaqoh', 'Berhasil')
 
   await page.goto(`${BASE}/dashboard`)
@@ -85,7 +85,7 @@ test('Admin penuh melihat seluruh data pada dashboard', async ({ page }) => {
 })
 
 test('Anggota memilih cakupan dashboard sendiri', async ({ page }) => {
-  await login(page, 'pwpetugas', 'pwpetugas123')
+  await login(page, 'pwpetugas', 'pwpetugas-anggota-2024')
   await createRecord(page, wa(2), 'Dashboard Anggota Satu', 'Ciputat', 'Program Antara', 'Proses')
 
   await page.goto(`${BASE}/dashboard`)
@@ -108,7 +108,7 @@ test('Anggota memilih cakupan dashboard sendiri', async ({ page }) => {
 })
 
 test('Admin kecamatan hanya melihat kecamatannya', async ({ page }) => {
-  await login(page, 'pwkec', 'pwkec12345')
+  await login(page, 'pwkec', 'pwkec-kecamatan-2024')
   await page.goto(`${BASE}/dashboard`)
   await page.waitForLoadState('networkidle')
 

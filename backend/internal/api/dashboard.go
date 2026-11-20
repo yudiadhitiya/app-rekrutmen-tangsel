@@ -84,7 +84,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request, user mo
 
 	records, err := s.allRekrutmen()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "gagal memuat data dashboard: "+err.Error())
+		writeStoreError(w, "gagal memuat data dashboard", err)
 		return
 	}
 

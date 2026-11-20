@@ -40,7 +40,7 @@ async function login(page, username: string, password: string) {
 test.describe.configure({ mode: 'serial' })
 
 test('Anggota melihat kartu upload dan bisa mengunduh template', async ({ page }) => {
-  await login(page, 'petugas', 'petugas123')
+  await login(page, 'petugas', 'e2e-petugas-Pass1')
 
   const card = page.getByText('Upload Data Massal')
   await expect(card).toBeVisible()
@@ -57,12 +57,12 @@ test('Anggota melihat kartu upload dan bisa mengunduh template', async ({ page }
 })
 
 test('Anggota penuh (level 3) tidak melihat kartu upload', async ({ page }) => {
-  await login(page, 'admin', 'admin123')
+  await login(page, 'admin', 'e2e-admin-Pass1')
   await expect(page.getByText('Upload Data Massal')).toHaveCount(0)
 })
 
 test('Upload CSV yang valid menyimpan data dan menampilkan ringkasan', async ({ page }) => {
-  await login(page, 'petugas', 'petugas123')
+  await login(page, 'petugas', 'e2e-petugas-Pass1')
 
   // The member already has records from the earlier runs, so the count is
   // compared before and after the upload.
@@ -83,7 +83,7 @@ test('Upload CSV yang valid menyimpan data dan menampilkan ringkasan', async ({ 
 })
 
 test('Baris yang salah tidak disimpan dan nomor barisnya dilaporkan', async ({ page }) => {
-  await login(page, 'petugas', 'petugas123')
+  await login(page, 'petugas', 'e2e-petugas-Pass1')
 
   const before = await page.locator('.data-table tbody tr').count()
 
@@ -102,7 +102,7 @@ test('Baris yang salah tidak disimpan dan nomor barisnya dilaporkan', async ({ p
 })
 
 test('Nomor yang sama di dalam satu file menggagalkan upload', async ({ page }) => {
-  await login(page, 'petugas', 'petugas123')
+  await login(page, 'petugas', 'e2e-petugas-Pass1')
 
   const file = writeCsv(
     'ganda',
@@ -116,7 +116,7 @@ test('Nomor yang sama di dalam satu file menggagalkan upload', async ({ page }) 
 })
 
 test('Nomor yang sudah terdaftar dilewati dan dilaporkan', async ({ page }) => {
-  await login(page, 'petugas', 'petugas123')
+  await login(page, 'petugas', 'e2e-petugas-Pass1')
 
   // The first upload stores the number.
   const first = writeCsv(
@@ -139,7 +139,7 @@ test('Nomor yang sudah terdaftar dilewati dan dilaporkan', async ({ page }) => {
 })
 
 test('Berkas dengan lebih dari 1.000 baris ditolak di sisi klien', async ({ page }) => {
-  await login(page, 'petugas', 'petugas123')
+  await login(page, 'petugas', 'e2e-petugas-Pass1')
 
   const rows = [HEADERS]
   for (let i = 0; i < 1001; i += 1) rows.push(csvRow(`E2E Volume ${i}`, `6288${String(i).padStart(7, '0')}`))
@@ -151,7 +151,7 @@ test('Berkas dengan lebih dari 1.000 baris ditolak di sisi klien', async ({ page
 })
 
 test('Ejaan metode dari aplikasi lama tetap diterima', async ({ page }) => {
-  await login(page, 'petugas', 'petugas123')
+  await login(page, 'petugas', 'e2e-petugas-Pass1')
 
   const file = writeCsv(
     'warisan',

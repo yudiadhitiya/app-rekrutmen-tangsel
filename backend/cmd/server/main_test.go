@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"rekrutmen-tangsel/backend/internal/auth"
+	"rekrutmen-tangsel/backend/internal/model"
 )
 
 // TestPrepareUsersCreatesOneAdminWithoutAKnownPassword checks that a fresh
@@ -104,5 +108,70 @@ func TestPrepareUsersRefusesAShortPassword(t *testing.T) {
 
 	if _, err := prepareUsers(dir); err == nil {
 		t.Fatal("password yang terlalu pendek harus ditolak")
+	}
+}
+
+// TestPrepareUsersRotatesAnOldDefaultPassword checks that an installation
+// that still has an account with a password from the source code gets that
+// account a new password.
+func TestPrepareUsersRotatesAnOldDefaultPassword(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	// An account of an installation that was made before the default
+	// passwords were removed.
+	usersPath := filepath.Join(dir, "users.json")
+	salt, hash, err := auth.HashPassword("admin123")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	stored := []auth.User{{
+		User: model.User{
+			ID:       "admin",
+			Username: "admin",
+			Nama:     "Administrator",
+			Role:     model.RoleAdmin,
+			Level:    model.LevelAdmin,
+		},
+		PasswordHash: hash,
+		Salt:         salt,
+	}}
+	b, err := json.MarshalIndent(stored, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal akun: %v", err)
+	}
+	if err := os.WriteFile(usersPath, b, 0o600); err != nil {
+		t.Fatalf("tulis akun: %v", err)
+	}
+
+	users, err := prepareUsers(dir)
+	if err != nil {
+		t.Fatalf("prepareUsers: %v", err)
+	}
+	if len(users) != 1 {
+		t.Fatalf("harus ada satu akun, dapat %d", len(users))
+	}
+
+	// The new password is written to a file that only the owner may read.
+	passFile := filepath.Join(dir, "rotated_passwords.txt")
+	info, err := os.Stat(passFile)
+	if err != nil {
+		t.Fatalf("berkas password yang dirotasi harus ada: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("izin berkas password yang dirotasi: %o, harus 600", perm)
+	}
+	content, err := os.ReadFile(passFile)
+	if err != nil {
+		t.Fatalf("baca berkas: %v", err)
+	}
+	if !strings.Contains(string(content), "username: admin") {
+		t.Errorf("berkas harus menyebut akun yang dirotasi: %s", content)
+	}
+
+	// The old password does not work anymore.
+	mgr := auth.NewManager(users, []byte("secret-untuk-uji"))
+	if _, err := mgr.VerifyPassword("admin", "admin123"); err == nil {
+		t.Error("password lama tidak boleh berlaku lagi")
 	}
 }

@@ -96,15 +96,112 @@ func Aktivitas(nama string) Fields {
 }
 
 // MinPasswordLength is the shortest password that is accepted.
-const MinPasswordLength = 6
+//
+// The password of an account is the only secret that protects the data of the
+// people who registered, so it has to be long enough to survive a guess.
+const MinPasswordLength = 12
+
+// MaxPasswordLength is the longest password that is accepted.
+//
+// A password beyond this length brings nothing but a slow hash, so it is
+// refused.
+const MaxPasswordLength = 200
+
+// weakPasswords are the passwords that are tried first in any guess.
+//
+// They are refused even when they are long enough, because a long password
+// that everybody knows is no password at all.
+var weakPasswords = map[string]bool{
+	"password":     true,
+	"password123":  true,
+	"password1234": true,
+	"admin":        true,
+	"admin123":     true,
+	"admin1234":    true,
+	"petugas":      true,
+	"petugas123":   true,
+	"petugas1234":  true,
+	"rahasia":      true,
+	"rahasia123":   true,
+	"rahasia1234":  true,
+	"12345678":     true,
+	"123456789":    true,
+	"1234567890":   true,
+	"123456789012": true,
+	"qwerty":       true,
+	"qwerty123":    true,
+	"111111111111": true,
+	"000000000000": true,
+}
 
 // Password validates a new password.
+//
+// The rules are the same everywhere a password is set: a password that is
+// changed and a password of a new registration are both checked with it.
 func Password(password string) Fields {
 	f := Fields{}
-	if len(strings.TrimSpace(password)) < MinPasswordLength {
+	p := strings.TrimSpace(password)
+	if len(p) < MinPasswordLength {
 		f["password"] = fmt.Sprintf("password minimal %d karakter", MinPasswordLength)
+		return f
+	}
+	if len(p) > MaxPasswordLength {
+		f["password"] = fmt.Sprintf("password maksimal %d karakter", MaxPasswordLength)
+		return f
+	}
+	if isWeakPassword(p) {
+		f["password"] = "password ini terlalu umum, pilih yang lain"
 	}
 	return f
+}
+
+// weakFragments are the parts of a password that are tried first.
+//
+// A password that holds one of them is refused, whatever else is added to
+// it, because the guess starts with that word anyway.
+var weakFragments = []string{
+	"password",
+	"admin123",
+	"petugas123",
+	"rahasia123",
+	"qwerty",
+	"123456",
+	"letmein",
+	"welcome",
+}
+
+// isWeakPassword reports whether the password is one that is guessed first.
+//
+// The word "password" is refused in any spelling, because it is the first
+// thing anybody tries, whatever is added to it.
+func isWeakPassword(password string) bool {
+	lower := strings.ToLower(password)
+	if weakPasswords[lower] {
+		return true
+	}
+	for _, fragment := range weakFragments {
+		if strings.Contains(lower, fragment) {
+			return true
+		}
+	}
+	runes := []rune(lower)
+	same := true
+	for _, r := range runes {
+		if r != runes[0] {
+			same = false
+			break
+		}
+	}
+	return same
+}
+
+// PasswordDiffersFromUsername reports whether the password is the name of the
+// account itself.
+//
+// Such a password is known to everybody who knows the account name, so it is
+// refused.
+func PasswordDiffersFromUsername(password, username string) bool {
+	return strings.EqualFold(strings.TrimSpace(password), strings.TrimSpace(username))
 }
 
 func contains(list []string, v string) bool {

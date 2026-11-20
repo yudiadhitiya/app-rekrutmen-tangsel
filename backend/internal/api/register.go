@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"rekrutmen-tangsel/backend/internal/model"
 	"rekrutmen-tangsel/backend/internal/seed"
 	"rekrutmen-tangsel/backend/internal/store/sheets"
+	"rekrutmen-tangsel/backend/internal/validate"
 )
 
 // Limits of a self-registration.
@@ -19,7 +21,10 @@ const (
 	// minUsernameLength is the shortest username that may be registered.
 	minUsernameLength = 4
 	// minPasswordLength is the shortest password that may be registered.
-	minPasswordLength = 6
+	//
+	// The password of a member reaches the data of other people, so it obeys
+	// the same rule as the password of an account that changes it.
+	minPasswordLength = validate.MinPasswordLength
 	// minAnswerLength is the shortest accepted security answer.
 	minAnswerLength = 2
 
@@ -35,10 +40,19 @@ const (
 type registerLimiter struct {
 	mu      sync.Mutex
 	entries map[string][]time.Time
+
+	// store keeps the counters on the disk, so a restart of the server does
+	// not hand a fresh set of attempts to whoever fills the sheet with
+	// accounts.
+	store *limiterStore
 }
 
-func newRegisterLimiter() *registerLimiter {
-	return &registerLimiter{entries: map[string][]time.Time{}}
+func newRegisterLimiter(store *limiterStore) *registerLimiter {
+	l := &registerLimiter{entries: map[string][]time.Time{}, store: store}
+	if store != nil {
+		l.entries = store.entries()
+	}
+	return l
 }
 
 // allow reports whether another attempt from the address is permitted.
@@ -58,6 +72,9 @@ func (l *registerLimiter) allow(address string) bool {
 		return false
 	}
 	l.entries[address] = append(kept, now)
+	if l.store != nil {
+		l.store.set(address, l.entries[address])
+	}
 	return true
 }
 
@@ -131,7 +148,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("gagal mendaftarkan anggota %s: %v", reg.Username, err)
-		writeError(w, http.StatusInternalServerError, "gagal menyimpan akun: "+err.Error())
+		writeStoreError(w, "gagal menyimpan akun", err)
 		return
 	}
 
@@ -159,7 +176,13 @@ func validateRegistration(reg model.Registration) error {
 		return errors.New("password wajib diisi")
 	}
 	if len([]rune(reg.Password)) < minPasswordLength {
-		return errors.New("password minimal 6 karakter")
+		return fmt.Errorf("password minimal %d karakter", minPasswordLength)
+	}
+	if fields := validate.Password(reg.Password); len(fields) > 0 {
+		return errors.New(fields["password"])
+	}
+	if validate.PasswordDiffersFromUsername(reg.Password, reg.Username) {
+		return errors.New("password tidak boleh sama dengan username")
 	}
 	if reg.Nama == "" {
 		return errors.New("nama wajib diisi")

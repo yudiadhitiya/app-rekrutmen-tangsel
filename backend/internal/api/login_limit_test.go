@@ -141,7 +141,7 @@ func TestPasswordChangeInvalidatesOldSession(t *testing.T) {
 
 	if code := e.request(http.MethodPut, "/api/me/password", map[string]string{
 		"current_password": "admin123",
-		"new_password":     "admin45678",
+		"new_password":     "admin-sekarang-2024",
 	}, nil); code != http.StatusOK {
 		t.Fatalf("ganti password gagal: %d", code)
 	}

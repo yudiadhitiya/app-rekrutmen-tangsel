@@ -20,11 +20,11 @@ func main() {
 		level                          int
 		kecamatan                      string
 	}{
-		{"petugas", "petugas123", "Petugas", model.RolePetugas, model.LevelAnggota, ""},
-		{"admin", "admin123", "Administrator", model.RoleAdmin, model.LevelAdmin, ""},
-		{"pwpetugas", "pwpetugas123", "Petugas Uji", model.RolePetugas, model.LevelAnggota, ""},
-		{"pwkec", "pwkec12345", "Kecamatan Uji", model.RoleAdmin, model.LevelAdminKecamatan, "Serpong"},
-		{"pwadmin", "pwadmin123", "Admin Uji", model.RoleAdmin, model.LevelAdmin, ""},
+		{"petugas", "e2e-petugas-Pass1", "Petugas", model.RolePetugas, model.LevelAnggota, ""},
+		{"admin", "e2e-admin-Pass1", "Administrator", model.RoleAdmin, model.LevelAdmin, ""},
+		{"pwpetugas", "pwpetugas-anggota-2024", "Petugas Uji", model.RolePetugas, model.LevelAnggota, ""},
+		{"pwkec", "pwkec-kecamatan-2024", "Kecamatan Uji", model.RoleAdmin, model.LevelAdminKecamatan, "Serpong"},
+		{"pwadmin", "pwadmin-sekolah-2024", "Admin Uji", model.RoleAdmin, model.LevelAdmin, ""},
 	}
 	users := []auth.User{}
 	for _, s := range specs {

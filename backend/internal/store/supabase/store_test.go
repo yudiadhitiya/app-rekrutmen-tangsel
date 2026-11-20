@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,6 +22,9 @@ type fakePostgREST struct {
 	nextID int
 	// failWith, when set, is returned as a 409 unique violation.
 	failWith string
+	// lastQuery holds the query of the last request, so a test can check the
+	// filter that the store builds.
+	lastQuery url.Values
 }
 
 func newFakePostgREST() *fakePostgREST {
@@ -32,6 +36,7 @@ func (f *fakePostgREST) serve(t *testing.T) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		table := strings.TrimPrefix(r.URL.Path, "/rest/v1/")
 		q := r.URL.Query()
+		f.lastQuery = q
 
 		if f.failWith != "" {
 			w.Header().Set("Content-Type", "application/json")

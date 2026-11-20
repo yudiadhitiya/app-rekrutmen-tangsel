@@ -133,6 +133,39 @@ atau dari pendaftaran mandiri.
 **Ganti password administrator setelah masuk, lalu hapus
 `data/initial_admin_password.txt`.**
 
+## Rotasi password lama
+
+Instalasi yang sudah berjalan sebelum perubahan ini masih punya akun dengan
+password `admin123` atau `petugas123`. Password itu tertulis di kode, jadi
+dikenal semua orang yang pernah membaca repo ini.
+
+Setiap kali server dijalankan, password seperti itu **diganti acak**. Password
+barunya ditulis ke `data/rotated_passwords.txt` (izin `0600`):
+
+```
+username: admin
+password: Xk3mQ7pR2vN9tWyB
+```
+
+Berikan password barunya ke pemilik akun, lalu hapus berkas tersebut. Rotasi
+hanya berjalan sekali: password yang sudah diganti tidak lagi cocok dengan
+password bawaan lama.
+
+## Aturan password
+
+Password baru (yang dibuat saat mengganti password atau saat mendaftar) harus
+memenuhi aturan ini:
+
+- panjang 12 sampai 200 karakter,
+- tidak boleh memuat password yang umum, seperti `password`, `admin123`,
+  `petugas123`, `rahasia123`, `qwerty`, atau `123456`,
+- tidak boleh sama dengan username akun,
+- tidak boleh sama dengan password lama.
+
+Password yang sudah ada tidak berubah karena aturan ini, jadi akun lama tetap
+bisa masuk. Yang perlu dilakukan hanya mengganti passwordnya saat opportunity
+memperbarui data.
+
 ## Menyiapkan Supabase
 
 1. Jalankan [`backend/supabase/schema.sql`](backend/supabase/schema.sql) di

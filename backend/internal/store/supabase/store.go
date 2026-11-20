@@ -117,14 +117,34 @@ func (s *Store) do(req *http.Request, out any) (*http.Response, error) {
 	return resp, nil
 }
 
+// pgSafe removes the characters that change the meaning of a filter of
+// PostgREST.
+//
+// A value that is put into a filter as it is may end that filter and start
+// another one, so a caller could ask for something else than the one asked
+// for. Only the characters that a name, a number or a district may hold are
+// kept, so the filter keeps its meaning.
+func pgSafe(value string) string {
+	var b strings.Builder
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == ' ', r == '-', r == '_', r == '/', r == '@', r == '+', r == '#':
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 	q := url.Values{}
-	if s := strings.TrimSpace(f.Q); s != "" {
+	if search := pgSafe(strings.TrimSpace(f.Q)); search != "" {
 		// Case-insensitive match on name or WhatsApp number.
-		q.Set("or", fmt.Sprintf("(nama.ilike.*%s*,no_wa.ilike.*%s*)", s, s))
+		q.Set("or", fmt.Sprintf("(nama.ilike.*%s*,no_wa.ilike.*%s*)", search, search))
 	}
 	if f.Scope.CreatedBy != "" {
-		q.Set("created_by", "eq."+f.Scope.CreatedBy)
+		q.Set("created_by", "eq."+pgSafe(f.Scope.CreatedBy))
 	}
 	// The scope of the account and the district filter of the request both
 	// narrow the district. A request for another district than the account
@@ -133,29 +153,29 @@ func (s *Store) ListRekrutmen(f model.Filter) ([]model.Rekrutmen, int, error) {
 	case f.Scope.Kecamatan != "" && f.Kecamatan != "" && !strings.EqualFold(f.Scope.Kecamatan, f.Kecamatan):
 		return []model.Rekrutmen{}, 0, nil
 	case f.Scope.Kecamatan != "":
-		q.Set("kecamatan", "eq."+f.Scope.Kecamatan)
+		q.Set("kecamatan", "eq."+pgSafe(f.Scope.Kecamatan))
 	case f.Kecamatan != "":
-		q.Set("kecamatan", "eq."+f.Kecamatan)
+		q.Set("kecamatan", "eq."+pgSafe(f.Kecamatan))
 	}
 	if f.Kelurahan != "" {
-		q.Set("kelurahan", "eq."+f.Kelurahan)
+		q.Set("kelurahan", "eq."+pgSafe(f.Kelurahan))
 	}
 	if f.Metode != "" {
 		// Use an "in" filter so the retired "Program"/"Antara" spellings still
 		// match the current "Program Antara" option.
 		values := model.MetodeMatchValues(f.Metode)
 		if len(values) == 1 {
-			q.Set("metode", "eq."+f.Metode)
+			q.Set("metode", "eq."+pgSafe(f.Metode))
 		} else {
 			quoted := make([]string, 0, len(values))
 			for _, v := range values {
-				quoted = append(quoted, `"`+v+`"`)
+				quoted = append(quoted, `"`+pgSafe(v)+`"`)
 			}
 			q.Set("metode", "in.("+strings.Join(quoted, ",")+")")
 		}
 	}
 	if f.Status != "" {
-		q.Set("status", "eq."+f.Status)
+		q.Set("status", "eq."+pgSafe(f.Status))
 	}
 	limit := f.Limit
 	if limit <= 0 {

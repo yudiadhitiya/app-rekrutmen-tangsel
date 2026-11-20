@@ -36,15 +36,27 @@ type loginLimiter struct {
 	mu      sync.Mutex
 	entries map[string][]time.Time
 	max     int
+
+	// store keeps the counters on the disk, so a restart of the server does
+	// not hand a new set of attempts to whoever tries to guess a password.
+	store *limiterStore
 }
 
 // newLoginLimiter builds a limiter that allows a given number of failed
 // attempts. A number of zero means the default.
-func newLoginLimiter(maxAttempts int) *loginLimiter {
+//
+// The store may be empty, which keeps the counters in the memory only.
+func newLoginLimiter(maxAttempts int, store *limiterStore) *loginLimiter {
 	if maxAttempts <= 0 {
 		maxAttempts = DefaultLoginMaxAttempts
 	}
-	return &loginLimiter{entries: map[string][]time.Time{}, max: maxAttempts}
+	l := &loginLimiter{entries: map[string][]time.Time{}, max: maxAttempts, store: store}
+	if store != nil {
+		for key, times := range store.entries() {
+			l.entries[key] = times
+		}
+	}
+	return l
 }
 
 // keys returns the counters that belong to an attempt.
@@ -96,6 +108,9 @@ func (l *loginLimiter) fail(username, address string) {
 	for _, key := range l.keys(username, address) {
 		kept := l.prune(key, now)
 		l.entries[key] = append(kept, now)
+		if l.store != nil {
+			l.store.set(key, l.entries[key])
+		}
 	}
 }
 
@@ -112,6 +127,9 @@ func (l *loginLimiter) reset(username, address string) {
 	for _, key := range l.keys(username, address) {
 		if strings.HasPrefix(key, "u:") {
 			delete(l.entries, key)
+			if l.store != nil {
+				l.store.remove(key)
+			}
 		}
 	}
 }

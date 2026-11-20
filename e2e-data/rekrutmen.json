@@ -39,6 +39,26 @@
       "updated_at": "2026-11-18T11:34:00.04897164Z",
       "created_by": "pwpetugas",
       "updated_by": "pwpetugas"
+    },
+    {
+      "id": "ed45fc68-29c1-401a-8229-b7d0db4c6a34",
+      "nama": "Dashboard Admin Satu",
+      "no_wa": "62867934831",
+      "alamat": "",
+      "rt": "",
+      "rw": "",
+      "kecamatan": "Serpong",
+      "kelurahan": "",
+      "aktivitas": "Wiraswasta",
+      "tingkat_penerimaan": "Terbuka",
+      "metode": "Halaqoh",
+      "status": "Berhasil",
+      "keterangan": "e2e dashboard",
+      "upl": "",
+      "created_at": "2026-11-18T21:20:08.117150777Z",
+      "updated_at": "2026-11-18T21:20:08.117150777Z",
+      "created_by": "pwadmin",
+      "updated_by": "pwadmin"
     }
   ],
   "aktivitas": [

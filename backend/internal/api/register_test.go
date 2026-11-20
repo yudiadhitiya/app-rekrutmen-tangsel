@@ -60,7 +60,7 @@ func newRegisterEnv(t *testing.T, registrar auth.Registrar) *testEnv {
 func validRegistration() map[string]string {
 	return map[string]string{
 		"username":  "anggota_baru",
-		"password":  "rahasia123",
+		"password":  "rahasia-anggota-2024",
 		"nama":      "Anggota Baru",
 		"kecamatan": "Ciputat",
 		"question1": model.SecurityQuestions[0],

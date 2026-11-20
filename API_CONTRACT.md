@@ -17,10 +17,16 @@ Roles: `admin` (everything), `petugas` (CRUD rekrutmen only).
 
 `PUT /me/password` mengubah password akun yang sedang masuk. Semua role boleh
 mengubah passwordnya sendiri; tidak ada pembatasan level. `current_password`
-wajib benar (400 bila salah), `new_password` minimal 6 karakter dan harus
-berbeda dari password lama (400 bila tidak). Password baru ikut ditulis ke
-tab `USERS` bila akunnya ada di aplikasi sebelumnya, jadi satu password
-berlaku di kedua aplikasi.
+wajib benar (400 bila salah), `new_password` minimal 12 karakter, maksimal 200
+karakter, tidak boleh berupa password yang umum (misalnya yang memuat
+"password", "admin123", "petugas123", atau "123456"), tidak boleh sama dengan
+username akun, dan harus berbeda dari password lama (400 bila tidak).
+Password baru ikut ditulis ke tab `USERS` bila akunnya ada di aplikasi
+sebelumnya, jadi satu password berlaku di kedua aplikasi.
+
+Aturan password yang sama berlaku pada pendaftaran mandiri: `POST /register`
+menolak password yang terlalu pendek, yang umum, atau yang sama dengan
+username.
 
 ## Master wilayah (read-only, all roles)
 

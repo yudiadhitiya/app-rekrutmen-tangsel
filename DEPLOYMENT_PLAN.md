@@ -296,6 +296,13 @@ server {
 | P-26 | **Header HSTS / X-Frame-Options / CSP / nosniff** | ✅ | `internal/api/security.go` — middleware `SecurityHeaders`; contoh nginx diperbarui |
 | P-27 | **Flag `Secure` pada cookie sesi** | ✅ | `internal/auth/auth.go` — `isSecure(r)`, dipakai `SetSession` & `ClearSession` |
 | P-28 | **Cookie `Secure` honoris proxy** | ✅ | `X-Forwarded-Proto: https` dikenali; `COOKIE_SECURE=true` memaksa flag |
+| P-30 | **Aturan password** | ✅ | `internal/validate/validate.go` — minimal 12 karakter, menolak password umum dan password yang sama dengan username |
+| P-31 | **Respons API tidak di-cache** | ✅ | `internal/api/security.go` — `Cache-Control: no-store` untuk semua jalur `/api/` |
+| P-32 | **Filter PostgREST disanitasi** | ✅ | `internal/store/supabase/store.go` — `pgSafe` membuang karakter yang mengubah arti filter |
+| P-33 | **Error internal tidak bocor ke klien** | ✅ | `internal/api/api.go` — `writeStoreError` menulis detail ke log server, jawaban hanya pesan umum |
+| P-34 | **Batas percobaan bertahan dari restart** | ✅ | `internal/api/limiter_store.go` — penghitung login, pendaftaran, dan upload disimpan di `data/limiter_*.json` |
+| P-35 | **Anti formula injection saat ekspor** | ✅ | `frontend/src/excel.js` — `escapeCSVCell` menutupi sel yang diawali `=`, `+`, `-`, `@` |
+| P-36 | **Mode `sheet` wajib opt-in** | ✅ | `cmd/server/main.go` — `LEGACY_AUTH_MODE=sheet` hanya jalan bila `ALLOW_UNSAFE_LEGACY_SHEET_AUTH=true` |
 
 > **P-27_detail (selesai):** cookie sesi di `backend/internal/auth/auth.go`
 > kini selalu menyertakan flag `Secure` bila permintaan itu aman — lewat
@@ -342,6 +349,10 @@ server {
 | `data/users.json` | hash password + salt | **tinggi** — jangan bocorkan |
 | `data/session.secret` | kunci penandatangan cookie | **tinggi** |
 | `data/initial_admin_password.txt` | password administrator awal | **tinggi** — hapus setelah password diganti |
+| `data/rotated_passwords.txt` | password hasil rotasi password bawaan lama | **tinggi** — bagikan ke pemilik akun, lalu hapus |
+| `data/limiter_login.json` | penghitung percobaan login gagal | rendah — jangan dihapus saat server berjalan |
+| `data/limiter_register.json` | penghitung pendaftaran | rendah |
+| `data/limiter_upload.json` | penghitung upload massal | rendah |
 | `data/settings.json` | provider aktif | rendah |
 | `data/*.json` (local store) | data rekrutmen | **tinggi** — data pribadi |
 | Supabase | data rekrutmen | **tinggi** |

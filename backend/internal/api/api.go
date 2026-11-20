@@ -104,9 +104,9 @@ func New(cfg Config, authMgr *auth.Manager, setStore *settings.Store) (*Server, 
 		cfg:             cfg,
 		auth:            authMgr,
 		settings:        setStore,
-		registerLimiter: newRegisterLimiter(),
-		loginLimiter:    newLoginLimiter(cfg.LoginMaxAttempts),
-		uploadLimiter:   newUploadLimiter(cfg.UploadMaxAttempts),
+		registerLimiter: newRegisterLimiter(newLimiterStore(limiterStorePath(cfg.DataDir, "limiter_register.json"))),
+		loginLimiter:    newLoginLimiter(cfg.LoginMaxAttempts, newLimiterStore(limiterStorePath(cfg.DataDir, "limiter_login.json"))),
+		uploadLimiter:   newUploadLimiter(cfg.UploadMaxAttempts, newLimiterStore(limiterStorePath(cfg.DataDir, "limiter_upload.json"))),
 		storeFactory: func(provider string) (store.Store, error) {
 			switch provider {
 			case settings.ProviderLocal:
@@ -206,6 +206,16 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]any{"error": msg})
+}
+
+// writeStoreError writes the answer for a failure of the server itself.
+//
+// The details of the failure go to the log of the server, not to the answer.
+// A detail may hold a path of the disk, a query of the provider or a name of
+// a file, and the browser has no need for it.
+func writeStoreError(w http.ResponseWriter, msg string, err error) {
+	log.Printf("%s: %v", msg, err)
+	writeError(w, http.StatusInternalServerError, msg)
 }
 
 // MaxJSONBody is the largest request body that is read as JSON.
@@ -374,7 +384,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		// The account store could not be reached; that is not the user's
 		// fault, so it is not reported as a wrong password.
-		writeError(w, http.StatusInternalServerError, "gagal memverifikasi akun: "+err.Error())
+		writeStoreError(w, "gagal memverifikasi akun", err)
 		return
 	}
 	s.loginLimiter.reset(username, s.clientAddress(r))
@@ -439,7 +449,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, us
 	case errors.Is(err, auth.ErrAccountNotFound):
 		writeError(w, http.StatusNotFound, "akun tidak ditemukan")
 	case err != nil:
-		writeError(w, http.StatusInternalServerError, "gagal mengubah password: "+err.Error())
+		writeStoreError(w, "gagal mengubah password", err)
 	default:
 		// The password change invalidated the sessions that were made
 		// before it, including this one. A fresh session is written, so the
@@ -491,7 +501,7 @@ func (s *Server) handleWilayah(w http.ResponseWriter, r *http.Request, user mode
 func (s *Server) handleListAktivitas(w http.ResponseWriter, r *http.Request, user model.User) {
 	list, err := s.Store().ListAktivitas()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "gagal memuat daftar aktivitas: "+err.Error())
+		writeStoreError(w, "gagal memuat daftar aktivitas", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -515,7 +525,7 @@ func (s *Server) handleCreateAktivitas(w http.ResponseWriter, r *http.Request, u
 			writeError(w, http.StatusConflict, "nama aktivitas sudah digunakan")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "gagal menyimpan aktivitas: "+err.Error())
+		writeStoreError(w, "gagal menyimpan aktivitas", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, a)
@@ -565,7 +575,7 @@ func (s *Server) handleUpdateAktivitas(w http.ResponseWriter, r *http.Request, u
 		case errors.Is(err, store.ErrNotFound):
 			writeError(w, http.StatusNotFound, "aktivitas tidak ditemukan")
 		default:
-			writeError(w, http.StatusInternalServerError, "gagal memperbarui aktivitas: "+err.Error())
+			writeStoreError(w, "gagal memperbarui aktivitas", err)
 		}
 		return
 	}
@@ -581,7 +591,7 @@ func (s *Server) handleDeleteAktivitas(w http.ResponseWriter, r *http.Request, u
 		case errors.Is(err, store.ErrNotFound):
 			writeError(w, http.StatusNotFound, "aktivitas tidak ditemukan")
 		default:
-			writeError(w, http.StatusInternalServerError, "gagal menghapus aktivitas: "+err.Error())
+			writeStoreError(w, "gagal menghapus aktivitas", err)
 		}
 		return
 	}
@@ -600,7 +610,7 @@ func (s *Server) handleListRekrutmen(w http.ResponseWriter, r *http.Request, use
 	f.Scope = user.ScopeFor()
 	data, total, err := s.Store().ListRekrutmen(f)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
+		writeStoreError(w, "gagal memuat data", err)
 		return
 	}
 	if data == nil {
@@ -627,7 +637,7 @@ func (s *Server) handleGetRekrutmen(w http.ResponseWriter, r *http.Request, user
 			writeError(w, http.StatusNotFound, "data tidak ditemukan")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
+		writeStoreError(w, "gagal memuat data", err)
 		return
 	}
 	if !canAccess(user, *rec) {
@@ -661,7 +671,7 @@ func (s *Server) handleCheckWA(w http.ResponseWriter, r *http.Request, user mode
 			writeJSON(w, http.StatusOK, map[string]any{"exists": false})
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "gagal memeriksa nomor: "+err.Error())
+		writeStoreError(w, "gagal memeriksa nomor", err)
 		return
 	}
 	// A record outside the scope of the account is reported as existing
@@ -717,7 +727,7 @@ func (s *Server) handleCreateRekrutmen(w http.ResponseWriter, r *http.Request, u
 			writeError(w, http.StatusConflict, "nomor whatsapp sudah terdaftar")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "gagal menyimpan data: "+err.Error())
+		writeStoreError(w, "gagal menyimpan data", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, rec)
@@ -745,7 +755,7 @@ func (s *Server) handleUpdateRekrutmen(w http.ResponseWriter, r *http.Request, u
 			writeError(w, http.StatusNotFound, "data tidak ditemukan")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
+		writeStoreError(w, "gagal memuat data", err)
 		return
 	}
 	if !canAccess(user, *prev) {
@@ -763,7 +773,7 @@ func (s *Server) handleUpdateRekrutmen(w http.ResponseWriter, r *http.Request, u
 		case errors.Is(err, store.ErrNotFound):
 			writeError(w, http.StatusNotFound, "data tidak ditemukan")
 		default:
-			writeError(w, http.StatusInternalServerError, "gagal memperbarui data: "+err.Error())
+			writeStoreError(w, "gagal memperbarui data", err)
 		}
 		return
 	}
@@ -777,7 +787,7 @@ func (s *Server) handleDeleteRekrutmen(w http.ResponseWriter, r *http.Request, u
 			writeError(w, http.StatusNotFound, "data tidak ditemukan")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "gagal memuat data: "+err.Error())
+		writeStoreError(w, "gagal memuat data", err)
 		return
 	}
 	// A record outside the scope of the account does not exist for it.
@@ -790,7 +800,7 @@ func (s *Server) handleDeleteRekrutmen(w http.ResponseWriter, r *http.Request, u
 			writeError(w, http.StatusNotFound, "data tidak ditemukan")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "gagal menghapus data: "+err.Error())
+		writeStoreError(w, "gagal menghapus data", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -850,17 +860,19 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request, user 
 	// rather than leaving the app without storage.
 	target, err := s.storeFactory(body.Provider)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		log.Printf("provider %q tidak bisa disiapkan: %v", body.Provider, err)
+		writeError(w, http.StatusBadRequest, "provider itu belum dikonfigurasi di server")
 		return
 	}
 	if err := target.Ping(); err != nil {
-		writeError(w, http.StatusBadGateway, "provider tidak dapat diakses: "+err.Error())
+		log.Printf("provider %q tidak dapat diakses: %v", body.Provider, err)
+		writeError(w, http.StatusBadGateway, "provider tidak dapat diakses")
 		return
 	}
 	// Seed the master activity list on the new provider, otherwise the picklist
 	// would be empty and no record could be created after the switch.
 	if err := seedAktivitasIfEmpty(target); err != nil {
-		writeError(w, http.StatusInternalServerError, "gagal menyiapkan master aktivitas: "+err.Error())
+		writeStoreError(w, "gagal menyiapkan master aktivitas", err)
 		return
 	}
 	if err := s.settings.Set(settings.Settings{Provider: body.Provider}); err != nil {

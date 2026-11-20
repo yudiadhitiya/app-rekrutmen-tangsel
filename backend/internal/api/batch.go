@@ -231,7 +231,7 @@ func (s *Server) handleBatchCreateRekrutmen(w http.ResponseWriter, r *http.Reque
 	// record does not stop the whole upload.
 	known, err := s.knownWAs()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "gagal memeriksa nomor whatsapp: "+err.Error())
+		writeStoreError(w, "gagal memeriksa nomor whatsapp", err)
 		return
 	}
 	toCreate := make([]model.Rekrutmen, 0, len(rows))
@@ -251,7 +251,7 @@ func (s *Server) handleBatchCreateRekrutmen(w http.ResponseWriter, r *http.Reque
 
 	if len(toCreate) > 0 {
 		if err := s.Store().CreateRekrutmenBatch(toCreate); err != nil {
-			writeError(w, http.StatusInternalServerError, "gagal menyimpan data: "+err.Error())
+			writeStoreError(w, "gagal menyimpan data", err)
 			return
 		}
 	}
@@ -336,17 +336,25 @@ type uploadLimiter struct {
 	mu          sync.Mutex
 	hits        map[string][]time.Time
 	maxAttempts int
+
+	// store keeps the counters on the disk, so a restart of the server does
+	// not hand a fresh set of attempts to whoever uploads many rows at once.
+	store *limiterStore
 }
 
 // newUploadLimiter builds a limiter that allows a few uploads per account.
 //
 // The limit can be raised through the configuration, so the end-to-end
 // checks can upload more files in a row.
-func newUploadLimiter(maxAttempts int) *uploadLimiter {
+func newUploadLimiter(maxAttempts int, store *limiterStore) *uploadLimiter {
 	if maxAttempts <= 0 {
 		maxAttempts = DefaultUploadMaxAttempts
 	}
-	return &uploadLimiter{hits: map[string][]time.Time{}, maxAttempts: maxAttempts}
+	l := &uploadLimiter{hits: map[string][]time.Time{}, maxAttempts: maxAttempts, store: store}
+	if store != nil {
+		l.hits = store.entries()
+	}
+	return l
 }
 
 // allow reports whether another upload may start.
@@ -370,5 +378,8 @@ func (l *uploadLimiter) allow(key string) bool {
 		return false
 	}
 	l.hits[key] = append(kept, now)
+	if l.store != nil {
+		l.store.set(key, l.hits[key])
+	}
 	return true
 }
