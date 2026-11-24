@@ -5,6 +5,7 @@ import { api, ApiError } from '../api'
 import { METODE, STATUS, TINGKAT_PENERIMAAN, UPL_OPTIONS, normalizeMetode } from '../constants'
 import { toast } from '../toast'
 import { confirmDialog } from '../confirm'
+import { auth } from '../auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,6 +39,25 @@ const aktivitasMaster = ref([])
 const selectedKecamatan = computed(() =>
   wilayah.value.kecamatan.find((item) => item.id === form.kecamatan)
 )
+
+// The kecamatan options the account may choose.
+//
+// An administrator of a district only writes in its own district, so only
+// that district is offered. The server refuses the others.
+const kecamatanOptions = computed(() => {
+  const own = auth.user && auth.user.level === 2 ? auth.user.kecamatan : ''
+  if (!own) return wilayah.value.kecamatan
+  return wilayah.value.kecamatan.filter((item) => item.nama === own)
+})
+
+// A member may name any district when it creates a record, but it may not
+// move a record that already exists, because the district decides whose
+// queue the record belongs to.
+const kecamatanLocked = computed(() => {
+  if (!auth.user) return false
+  if (auth.user.level === 3) return false
+  return isEdit.value
+})
 
 const kelurahanOptions = computed(() => {
   if (!selectedKecamatan.value) return []
@@ -460,11 +480,11 @@ onMounted(async () => {
                 :class="{ 'select--error': errors.kecamatan }"
                 :aria-invalid="errors.kecamatan ? 'true' : 'false'"
                 :aria-describedby="errors.kecamatan ? 'f-kecamatan-error' : undefined"
-                :disabled="saving"
+                :disabled="saving || kecamatanLocked"
                 @change="setError('kecamatan', '')"
               >
                 <option value="">-- Pilih Kecamatan --</option>
-                <option v-for="item in wilayah.kecamatan" :key="item.id" :value="item.id">{{ item.nama }}</option>
+                <option v-for="item in kecamatanOptions" :key="item.id" :value="item.id">{{ item.nama }}</option>
               </select>
               <span v-if="errors.kecamatan" id="f-kecamatan-error" class="field__error">{{ errors.kecamatan }}</span>
             </div>

@@ -40,24 +40,25 @@ func TestAPIResponsesAreNotStoredInACache(t *testing.T) {
 func TestLoginLimiterSurvivesARestart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "limiter_login.json")
 
+	// The limit of an account is twice the limit of the limiter.
 	first := newLoginLimiter(3, newLimiterStore(path))
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 6; i++ {
 		first.fail("admin", "192.0.2.1")
 	}
-	if first.allow("admin", "192.0.2.1") {
-		t.Fatal("limiter harus menolak setelah tiga kegagalan")
+	if !first.locked("admin") {
+		t.Fatal("penghitung akun harus menolak setelah kegagalan cukup banyak")
 	}
 
 	// The server starts again and reads the counters from the disk.
 	second := newLoginLimiter(3, newLimiterStore(path))
-	if second.allow("admin", "192.0.2.1") {
+	if !second.locked("admin") {
 		t.Error("penghitung harus bertahan setelah server dimulai ulang")
 	}
 
 	// A sign in that succeeds clears the counter of the account.
 	second.reset("admin", "192.0.2.1")
 	third := newLoginLimiter(3, newLimiterStore(path))
-	if !third.allow("admin", "192.0.2.1") {
+	if third.locked("admin") {
 		t.Error("penghitung akun harus bersih setelah masuk berhasil")
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -72,6 +73,13 @@ type Config struct {
 	// Without it the address of the connection is used. Behind a reverse
 	// proxy that means every request shares the address of the proxy.
 	TrustProxy bool
+
+	// AllowSelfRegistration says that strangers may create their own account.
+	//
+	// A new account writes into the shared spreadsheet, so an open endpoint
+	// lets anybody on the internet put rows into the production data. It is
+	// therefore off unless the operator turns it on deliberately.
+	AllowSelfRegistration bool
 }
 
 // Server holds the HTTP handlers and the active storage provider.
@@ -370,15 +378,41 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username := strings.TrimSpace(body.Username)
-	if s.loginLocked(w, r, username) {
+	address := s.clientAddress(r)
+
+	// The limit of the address refuses before the password is checked, so a
+	// flood from one address costs the server nothing.
+	if s.loginAddressLocked(w, r, username) {
 		return
 	}
+
+	// An account that is being guessed at may only try its password every
+	// few seconds, so a flood against one account cannot use up the server.
+	if !s.loginLimiter.mayTry(username, address) {
+		w.Header().Set("Retry-After", "10")
+		writeError(w, http.StatusTooManyRequests,
+			"terlalu banyak percobaan login untuk akun ini. Coba lagi sebentar.")
+		return
+	}
+
 	user, fromLegacy, err := s.auth.VerifyLogin(body.Username, body.Password)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			// The failed attempt is counted, so the password cannot be
 			// guessed by trying many times.
-			s.loginLimiter.fail(username, s.clientAddress(r))
+			locked := s.loginLimiter.locked(username)
+			s.loginLimiter.fail(username, address)
+			if locked {
+				// The account is being guessed at, so the wrong password is
+				// refused. A password that is right always gets in, so an
+				// attacker cannot lock the account out of the application.
+				if wait := s.loginLimiter.lockedFor(username); wait > 0 {
+					w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+				}
+				writeError(w, http.StatusTooManyRequests,
+					"terlalu banyak percobaan login untuk akun ini. Coba lagi nanti.")
+				return
+			}
 			writeError(w, http.StatusUnauthorized, "username atau password salah")
 			return
 		}
@@ -387,7 +421,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, "gagal memverifikasi akun", err)
 		return
 	}
-	s.loginLimiter.reset(username, s.clientAddress(r))
+	s.loginLimiter.reset(username, address)
 
 	// The account came from the previous application. Store it locally, so
 	// the next sign in uses the salted hash of this application.
@@ -657,6 +691,58 @@ func canAccess(user model.User, rec model.Rekrutmen) bool {
 	return model.MatchScope(user.ScopeFor(), rec)
 }
 
+// checkDistrictScope refuses a write that would put a record into the scope
+// of another district.
+//
+// The scope of an account decides which records it may reach, and the scope
+// of a district administrator is the district of the record. Without this
+// check the district of the request body decides that, so an administrator
+// of one district could move a record into the queue of another district, or
+// hide one from their own.
+//
+// A full administrator reaches every district, so it may write any of them.
+//
+// A district administrator only reaches the records of its own district, so it
+// may only write in that district.
+//
+// A member only reaches the records it created itself. It may name any
+// district when it creates a record, but it may not move a record that
+// already exists, because that would put the record into the queue of
+// another district.
+func checkDistrictScope(user model.User, rec *model.Rekrutmen, stored *model.Rekrutmen) error {
+	switch user.LevelOrDefault() {
+	case model.LevelAdmin:
+		return nil
+	case model.LevelAdminKecamatan:
+		own := strings.TrimSpace(user.Kecamatan)
+		if own == "" {
+			// The account reaches only the records it created itself, so it
+			// has no district of its own to write in.
+			return checkMemberDistrict(rec, stored)
+		}
+		if !strings.EqualFold(strings.TrimSpace(rec.Kecamatan), own) {
+			return errors.New("kecamatan data harus sama dengan kecamatan Anda")
+		}
+		return nil
+	default:
+		return checkMemberDistrict(rec, stored)
+	}
+}
+
+// checkMemberDistrict keeps the district of a stored record where it is.
+//
+// The district of a record decides the queue of the district administrator
+// that sees it, so moving it hands the record to another district.
+func checkMemberDistrict(rec *model.Rekrutmen, stored *model.Rekrutmen) error {
+	if stored == nil {
+		return nil
+	}
+	if !strings.EqualFold(strings.TrimSpace(rec.Kecamatan), strings.TrimSpace(stored.Kecamatan)) {
+		return errors.New("kecamatan data tidak boleh diubah")
+	}
+	return nil
+}
+
 // handleCheckWA reports whether a WhatsApp number is already registered, so the
 // UI can warn before saving.
 func (s *Server) handleCheckWA(w http.ResponseWriter, r *http.Request, user model.User) {
@@ -711,6 +797,10 @@ func (s *Server) handleCreateRekrutmen(w http.ResponseWriter, r *http.Request, u
 		bodyError(w, err)
 		return
 	}
+	if err := checkDistrictScope(user, rec, nil); err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
 	if fields := validate.Rekrutmen(rec, s.aktivitasNames()); len(fields) > 0 {
 		writeFieldError(w, "validasi gagal", fields)
 		return
@@ -760,6 +850,12 @@ func (s *Server) handleUpdateRekrutmen(w http.ResponseWriter, r *http.Request, u
 	}
 	if !canAccess(user, *prev) {
 		writeError(w, http.StatusNotFound, "data tidak ditemukan")
+		return
+	}
+	// The district of the record decides whose scope it belongs to, so it may
+	// not be moved into the scope of another district.
+	if err := checkDistrictScope(user, rec, prev); err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
 		return
 	}
 	rec.CreatedAt = prev.CreatedAt

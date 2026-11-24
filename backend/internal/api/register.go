@@ -92,7 +92,7 @@ func (s *Server) handleRegisterOptions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"questions": model.SecurityQuestions,
 		"kecamatan": kecamatan,
-		"available": s.auth.CanRegister(),
+		"available": s.auth.CanRegister() && s.cfg.AllowSelfRegistration,
 	})
 }
 
@@ -102,6 +102,14 @@ func (s *Server) handleRegisterOptions(w http.ResponseWriter, r *http.Request) {
 // with the same layout and hashing, so the member can sign in with it in
 // both applications.
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	// A new account writes into the shared spreadsheet, so an open endpoint
+	// lets anybody on the internet put rows into the production data. The
+	// operator has to turn the endpoint on deliberately.
+	if !s.cfg.AllowSelfRegistration {
+		writeError(w, http.StatusServiceUnavailable, "pendaftaran anggota tidak diaktifkan")
+		return
+	}
+
 	var body struct {
 		Username  string `json:"username"`
 		Password  string `json:"password"`

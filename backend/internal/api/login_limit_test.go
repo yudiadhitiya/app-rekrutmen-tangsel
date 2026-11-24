@@ -36,21 +36,60 @@ func newLoginTestEnv(t *testing.T, maxAttempts int) *testEnv {
 	return &testEnv{t: t, server: srv, client: &http.Client{Jar: jar}, base: ts.URL}
 }
 
-// TestLoginLockedAfterTooManyFailures checks that the sign in is refused
-// after too many failed attempts, so a password cannot be guessed by trying
-// many times.
-func TestLoginLockedAfterTooManyFailures(t *testing.T) {
+// TestLockedAccountRejectsWrongPasswordsButLetsRightPasswordIn checks
+// that an account under brute-force attack still accepts the correct
+// password, so an attacker cannot lock the account out.
+func TestLockedAccountRejectsWrongPasswordsButLetsRightPasswordIn(t *testing.T) {
 	e := newLoginTestEnv(t, 3)
 
-	for i := 0; i < 3; i++ {
-		if code := e.login("admin", "salah"); code != http.StatusUnauthorized {
+	// The account limit is 2 * max = 6 failures in 3 hours.
+	// The attacker sends 6 wrong passwords from one address.
+	for i := 0; i < 6; i++ {
+		code := e.loginFrom("admin", "salah", "198.51.100.1:5555")
+		if code != http.StatusUnauthorized {
 			t.Fatalf("percobaan %d: status %d, ingin 401", i+1, code)
 		}
 	}
-
-	code := e.login("admin", "admin123")
+	// The 7th wrong attempt trips the account counter and is
+	// refused with 429.
+	code := e.loginFrom("admin", "salah", "198.51.100.1:5555")
 	if code != http.StatusTooManyRequests {
-		t.Errorf("status setelah kunci: %d, ingin 429", code)
+		t.Fatalf("percobaan ke-7 (terkunci): status %d, ingin 429", code)
+	}
+
+	// The correct password from a different address (the admin's
+	// own office) still works even while the account is locked.
+	// This is the core defense against lockout abuse.
+	code = e.loginFrom("admin", "admin123", "203.0.113.5:5555")
+	if code != http.StatusOK {
+		t.Errorf("password yang benar harus diterima dari alamat baru, kode %d", code)
+	}
+}
+
+// TestLockedAccountRejectsWrongPasswordsFromDifferentAddresses checks
+// that a distributed brute force against an account is also stopped
+// by the account counter.
+func TestLockedAccountRejectsWrongPasswordsFromDifferentAddresses(t *testing.T) {
+	e := newLoginTestEnv(t, 3)
+
+	// Fail from 6 different addresses. The account limit is 6,
+	// so the 7th failure trips the counter.
+	for i := 0; i < 6; i++ {
+		code := e.loginFrom("admin", "salah", "10.0.0."+string(rune('1'+i))+":5555")
+		if code != http.StatusUnauthorized {
+			t.Fatalf("percobaan %d dari 10.0.0.%d: status %d, ingin 401", i+1, i+1, code)
+		}
+	}
+	// The 7th failure from yet another address trips the counter.
+	code := e.loginFrom("admin", "salah", "10.0.0.99:5555")
+	if code != http.StatusTooManyRequests {
+		t.Fatalf("percobaan ke-7 (terkunci): status %d, ingin 429", code)
+	}
+
+	// The correct password from yet another address still works.
+	code = e.loginFrom("admin", "admin123", "203.0.113.1:5555")
+	if code != http.StatusOK {
+		t.Errorf("password yang benar harus diterima dari alamat baru, kode %d", code)
 	}
 }
 

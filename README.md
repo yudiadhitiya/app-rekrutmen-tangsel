@@ -92,6 +92,7 @@ Environment (opsional):
 | `COOKIE_SECURE`   | `true` memaksa flag `Secure` pada cookie sesi; default `auto` (mengikuti TLS atau `X-Forwarded-Proto: https`) |
 | `ALLOWED_ORIGINS` | origin yang boleh memanggil API dengan kredensial, dipisah koma; kosong = hanya asal yang sama |
 | `TRUST_PROXY` | `true` bila aplikasi di belakang reverse proxy sendiri (nginx) yang menulis alamat asli di `X-Forwarded-For`; default `false` (alamat koneksi) |
+| `ALLOW_SELF_REGISTRATION` | `true` bila orang luar boleh mendaftar sendiri; default `false` (hanya admin yang membuat akun) |
 
 Backend membaca konfigurasi langsung dari environment; tidak ada file `.env`
 yang dimuat otomatis. Untuk pengembangan, ekspor variabelnya di shell:
@@ -261,9 +262,16 @@ disimpan sebagai hash SHA-256 tanpa salt. Jadi akun itu langsung aktif dan bisa
 dipakai di kedua aplikasi. Pada login pertama, akun dimindahkan ke penyimpanan
 lokal dengan hash PBKDF2 bersalt.
 
-Syaratnya: `GOOGLE_SHEET_ID` dan `GOOGLE_KEY_FILE` terisi (agar tab `USERS`
-bisa ditulis) dan `LEGACY_AUTH_MODE` bukan `off`. Tanpa itu, endpoint
-pendaftaran menjawab `503` dan tombol pendaftaran disembunyikan.
+Syaratnya: `ALLOW_SELF_REGISTRATION=true`, `GOOGLE_SHEET_ID` dan
+`GOOGLE_KEY_FILE` terisi (agar tab `USERS` bisa ditulis) dan
+`LEGACY_AUTH_MODE` bukan `off`. Tanpa itu, endpoint pendaftaran menjawab `503`
+dan tombol pendaftaran disembunyikan.
+
+> **Pendaftaran mandiri mati secara bawaan.** Akun baru langsung boleh menulis
+> ke spreadsheet yang dipakai bersama, jadi endpoint yang terbuka membuat siapa
+> pun di internet bisa menyuntik baris ke data produksi. Nyalakan hanya bila
+> memang ada orang luar yang perlu mendaftar:
+> `ALLOW_SELF_REGISTRATION=true`.
 
 Endpoint publiknya:
 

@@ -139,6 +139,24 @@ func (e *testEnv) login(username, password string) int {
 	}, nil)
 }
 
+// loginFrom signs in from the given address and returns the status code.
+//
+// The request is handed to the handler directly, so the address of the
+// caller can be chosen. A real client would always come from the address of
+// the test machine.
+func (e *testEnv) loginFrom(username, password, address string) int {
+	e.t.Helper()
+	body, err := json.Marshal(map[string]string{"username": username, "password": password})
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewReader(body))
+	req.RemoteAddr = address
+	rec := httptest.NewRecorder()
+	e.server.Handler().ServeHTTP(rec, req)
+	return rec.Code
+}
+
 func validBody() map[string]any {
 	return map[string]any{
 		"nama":               "Ahmad Fauzi",

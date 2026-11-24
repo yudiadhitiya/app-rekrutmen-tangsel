@@ -24,7 +24,14 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # true bila aplikasi di belakang reverse proxy yang menulis alamat
       # pengirim di X-Forwarded-For (nginx). Wajib true di produksi.
-      TRUST_PROXY: ${TRUST_PROXY:-false}
+      # nginx menimpa header itu dengan $remote_addr, jadi nilainya
+      # trustworthy. Tanpa ini semua permintaan terlihat dari satu alamat
+      # dan satu penyerang bisa mengunci seluruh pengguna.
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      # Pendaftaran sendiri membuat akun yang langsung boleh menulis ke
+      # spreadsheet bersama. Endpoint itu mati secara bawaan; nyalakan
+      # hanya bila memang ada orang luar yang perlu mendaftar.
+      ALLOW_SELF_REGISTRATION: ${ALLOW_SELF_REGISTRATION:-false}
       # Origin yang boleh memanggil API, dipisah koma.
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       LEGACY_AUTH_MODE: ${LEGACY_AUTH_MODE:-upgrade}

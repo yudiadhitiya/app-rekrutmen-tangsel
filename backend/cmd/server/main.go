@@ -181,6 +181,10 @@ func main() {
 		LoginMaxAttempts:         envInt("LOGIN_MAX_ATTEMPTS", api.DefaultLoginMaxAttempts),
 		AllowedOrigins:           splitList(os.Getenv("ALLOWED_ORIGINS")),
 		TrustProxy:               envBool("TRUST_PROXY", false),
+
+		// Pendaftaran sendiri menulis ke spreadsheet yang dipakai bersama,
+		// jadi endpoint itu hanya dibuka bila operator memintanya.
+		AllowSelfRegistration: envBool("ALLOW_SELF_REGISTRATION", false),
 	}
 
 	// The header X-Forwarded-For is only read when the reverse proxy of this

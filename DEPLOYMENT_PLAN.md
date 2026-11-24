@@ -127,6 +127,8 @@ Prinsip:
 | `LEGACY_AUTH_MODE` | `upgrade` | tidak | `upgrade`, `sheet`, atau `off` |
 | `APP_ROOT` | `.` | ya | root aplikasi untuk path relatif |
 | `UPLOAD_MAX_ATTEMPTS` | `5` | tidak | jumlah upload massal per akun per 10 menit |
+| `TRUST_PROXY` | `true` | ya | `true` bila di belakang nginx yang menimpa `X-Forwarded-For`; tanpa ini semua permintaan terlihat dari satu alamat dan satu penyerang bisa mengunci seluruh pengguna |
+| `ALLOW_SELF_REGISTRATION` | `false` | tidak | `true` hanya bila orang luar boleh mendaftar sendiri; akun baru langsung boleh menulis ke spreadsheet bersama |
 
 ---
 
@@ -221,6 +223,8 @@ COOKIE_SECURE=true
 ALLOWED_ORIGINS=
 # nginx menulis alamat asli di X-Forwarded-For, jadi header itu dipercaya
 TRUST_PROXY=true
+# Pendaftaran mandiri: biarkan false, hanya admin yang membuat akun.
+ALLOW_SELF_REGISTRATION=false
 ```
 
 ### Contoh konfigurasi nginx

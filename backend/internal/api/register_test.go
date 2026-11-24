@@ -33,6 +33,10 @@ func (f *fakeRegistrar) RegisterUser(reg model.Registration) error {
 
 // newRegisterEnv builds a server whose accounts are registered through the
 // given registrar. A nil registrar means no account store is configured.
+//
+// The registration endpoint is turned on, because these tests are about the
+// endpoint itself. It is off by default, so the test of the default lives in
+// its own file.
 func newRegisterEnv(t *testing.T, registrar auth.Registrar) *testEnv {
 	t.Helper()
 	dir := t.TempDir()
@@ -44,7 +48,7 @@ func newRegisterEnv(t *testing.T, registrar auth.Registrar) *testEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := New(Config{DataDir: dir}, authMgr, setStore)
+	srv, err := New(Config{DataDir: dir, AllowSelfRegistration: true}, authMgr, setStore)
 	if err != nil {
 		t.Fatal(err)
 	}
